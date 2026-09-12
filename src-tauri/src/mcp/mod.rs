@@ -1,0 +1,174 @@
+use rmcp::{
+    ErrorData, ServerHandler,
+    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo},
+    tool, tool_handler, tool_router,
+    transport::streamable_http_server::{StreamableHttpService, session::local::LocalSessionManager},
+};
+use tauri::{AppHandle, Emitter};
+
+use crate::session::manager::{SessionConfig, SharedManager};
+
+#[derive(Clone)]
+pub struct McpServer {
+    tool_router: ToolRouter<Self>,
+    mgr: SharedManager,
+    app: AppHandle,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct CreateSessionParams {
+    pub protocol: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub private_key: Option<String>,
+    pub private_key_passphrase: Option<String>,
+    pub serial_port: Option<String>,
+    pub baud_rate: Option<u32>,
+    pub data_bits: Option<u8>,
+    pub stop_bits: Option<u8>,
+    pub parity: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct IdParams {
+    pub session_id: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct SendParams {
+    pub session_id: String,
+    pub text: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct GetOutputParams {
+    pub session_id: String,
+    pub offset: Option<u64>,
+    pub tail: Option<usize>,
+}
+
+#[tool_router(router = tool_router)]
+impl McpServer {
+    fn new(mgr: SharedManager, app: AppHandle) -> Self {
+        Self { tool_router: Self::tool_router(), mgr, app }
+    }
+
+    #[tool(description = "Create a new SSH/Telnet/Serial session. Returns JSON {session_id}. protocol: ssh|telnet|serial")]
+    async fn create_session(
+        &self,
+        Parameters(p): Parameters<CreateSessionParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let cfg = SessionConfig {
+            protocol: p.protocol,
+            host: p.host,
+            port: p.port,
+            username: p.username,
+            password: p.password,
+            private_key: p.private_key,
+            private_key_passphrase: p.private_key_passphrase,
+            serial_port: p.serial_port,
+            baud_rate: p.baud_rate,
+            data_bits: p.data_bits,
+            stop_bits: p.stop_bits,
+            parity: p.parity,
+        };
+        let id = self.mgr.lock().await.create(cfg.clone());
+        let _ = self.app.emit("sessions-changed", ());
+        let mgr2 = self.mgr.clone();
+        let id2 = id.clone();
+        let app = self.app.clone();
+        tauri::async_runtime::spawn(crate::connector::connect_session(mgr2, id2, cfg, app));
+        Ok(tool_text(format!("{{\"session_id\":\"{id}\"}}")))
+    }
+
+    #[tool(description = "Close and remove a session by id")]
+    async fn close_session(
+        &self,
+        Parameters(p): Parameters<IdParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.mgr
+            .lock()
+            .await
+            .close(&p.session_id)
+            .await
+            .map_err(map_err)?;
+        let _ = self.app.emit("sessions-changed", ());
+        Ok(tool_text("closed".into()))
+    }
+
+    #[tool(description = "List all sessions as JSON array [{id,protocol,target,state}]")]
+    async fn list_sessions(&self) -> Result<CallToolResult, ErrorData> {
+        let v = self.mgr.lock().await.list();
+        Ok(tool_text(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())))
+    }
+
+    #[tool(description = "Send input text to a session (append \\n yourself to press Enter)")]
+    async fn send_input(
+        &self,
+        Parameters(p): Parameters<SendParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        crate::zmodem::note_input(&p.session_id, &p.text);
+        self.mgr
+            .lock()
+            .await
+            .send_input(&p.session_id, p.text.as_bytes())
+            .await
+            .map_err(map_err)?;
+        Ok(tool_text("sent".into()))
+    }
+
+    #[tool(description = "Read session output. If tail given: last N bytes as text. Else incremental: returns JSON {output, next_offset}; pass next_offset as offset next time. Poll repeatedly until stable to detect command completion")]
+    async fn get_output(
+        &self,
+        Parameters(p): Parameters<GetOutputParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let mgr = self.mgr.lock().await;
+        if let Some(t) = p.tail {
+            let bytes = mgr.tail_output(&p.session_id, t).map_err(map_err)?;
+            return Ok(tool_text(String::from_utf8_lossy(&bytes).to_string()));
+        }
+        let (out, next) = mgr
+            .get_output(&p.session_id, p.offset.unwrap_or(0))
+            .map_err(map_err)?;
+        Ok(tool_text(
+            serde_json::json!({ "output": String::from_utf8_lossy(&out), "next_offset": next })
+                .to_string(),
+        ))
+    }
+}
+
+#[tool_handler(router = self.tool_router)]
+impl ServerHandler for McpServer {
+    fn get_info(&self) -> ServerInfo {
+        let mut info = ServerInfo::new(ServerCapabilities::builder().enable_tools().build());
+        info.server_info = Implementation::new("xtshell-mcp", env!("CARGO_PKG_VERSION"));
+        info
+    }
+}
+
+fn tool_text(s: String) -> CallToolResult {
+    CallToolResult::success(vec![ContentBlock::text(s)])
+}
+
+fn map_err(e: crate::error::AppError) -> ErrorData {
+    ErrorData::internal_error(e.to_string(), None)
+}
+
+pub async fn serve_mcp(
+    mgr: SharedManager,
+    app: AppHandle,
+    port: u16,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let service = StreamableHttpService::new(
+        move || Ok(McpServer::new(mgr.clone(), app.clone())),
+        LocalSessionManager::default().into(),
+        Default::default(),
+    );
+    let router = axum::Router::new().nest_service("/mcp", service);
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
+    axum::serve(listener, router).await?;
+    Ok(())
+}

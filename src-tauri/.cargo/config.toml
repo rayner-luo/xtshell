@@ -1,0 +1,5 @@
+# 本机未装 NASM，aws-lc-sys 需要 NASM 或预编译对象。
+# cargo 会把 [env] 注入所有由其启动的进程（含 build script），
+# 因此无需再手动加 AWS_LC_SYS_PREBUILT_NASM=1 前缀。
+[env]
+AWS_LC_SYS_PREBUILT_NASM = "1"
