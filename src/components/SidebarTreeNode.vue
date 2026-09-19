@@ -2,6 +2,7 @@
 import { computed, ref, type Directive } from "vue";
 import { useProfilesStore } from "../stores/profiles";
 import { openCtxMenu } from "../composables/contextMenu";
+import { FolderIcon } from "./icons";
 import type { ProfileFolder, ProfileSessionView } from "../types/profile";
 
 const props = defineProps<{
@@ -129,7 +130,7 @@ function onDrop(e: DragEvent) {
     >
       <span class="caret" @click.stop="toggle">{{ expanded ? "▾" : "▸" }}</span>
       <template v-if="!editing">
-        <span class="icon">📁</span>
+        <component class="icon" :is="FolderIcon" />
         <span class="name" @dblclick="startEdit">{{ folder!.name }}</span>
         <span class="count">{{ childFolders.length + childSessions.length || "" }}</span>
       </template>
@@ -220,6 +221,7 @@ function onDrop(e: DragEvent) {
 
 .icon {
   font-size: 12px;
+  color: #64dafe;
 }
 
 .name {

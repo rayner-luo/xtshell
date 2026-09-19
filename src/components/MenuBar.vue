@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type VNode } from "vue";
 import { useSessionStore } from "../stores/session";
+import { useSessionLog } from "../composables/useSessionLog";
+import { AboutIcon, AddIcon, ConnectIcon, CopyIcon, DisconnectIcon, EncodingIcon, ExitIcon, FontIcon, LogIcon, McpIcon, PasteIcon, SftpIcon } from "./icons";
 
 type MenuEvent =
   | "new-session"
@@ -12,6 +14,7 @@ type MenuEvent =
   | "copy"
   | "paste"
   | "reconnect"
+  | "toggle-log"
   | "exit"
   | "about";
 
@@ -19,8 +22,11 @@ interface MenuItem {
   label: string;
   event?: MenuEvent;
   icon?: string;
+  iconComponent?: () => VNode;
   shortcut?: string;
   disabled?: boolean;
+  /** 激活态图标颜色（与工具栏按钮一致），未配置或禁用时保持灰色 */
+  activeColor?: string;
 }
 
 interface Menu {
@@ -37,42 +43,50 @@ const hasActive = computed(() => sessionStore.activeSession != null);
 const canReconnect = computed(
   () => sessionStore.activeSession?.state === "closed",
 );
+const isSsh = computed(() => sessionStore.activeSession?.protocol === "ssh");
+const sessionLog = useSessionLog();
 
 const menus = computed<Menu[]>(() => [
   {
     name: "文件",
     items: [
-      { label: "新建", event: "new-session", icon: "➕", shortcut: "Ctrl+N" },
-      { label: "退出", event: "exit", icon: "✕" },
+      { label: "新建", event: "new-session", iconComponent: AddIcon, shortcut: "Ctrl+N" },
+      { label: "退出", event: "exit", iconComponent: ExitIcon },
     ],
   },
   { name: "编辑", items: [
-    { label: "复制", event: "copy", icon: "⧉", disabled: !hasActive.value },
-    { label: "粘贴", event: "paste", icon: "📋", disabled: !hasActive.value },
+    { label: "复制", event: "copy", iconComponent: CopyIcon, activeColor: "#64dafe", disabled: !hasActive.value },
+    { label: "粘贴", event: "paste", iconComponent: PasteIcon, activeColor: "#64dafe", disabled: !hasActive.value },
   ] },
   {
     name: "会话",
     items: [
-      { label: "断开", event: "disconnect", icon: "⛓️‍💥", disabled: !hasActive.value },
-      { label: "重连", event: "reconnect", icon: "🔗", disabled: !canReconnect.value },
+      { label: "断开", event: "disconnect", iconComponent: DisconnectIcon, activeColor: "#64dafe", disabled: !hasActive.value },
+      { label: "重连", event: "reconnect", iconComponent: ConnectIcon, activeColor: "#64dafe", disabled: !canReconnect.value },
+      { label: "日志", event: "toggle-log", iconComponent: LogIcon, activeColor: sessionLog.isRecording.value ? "#ff6b6b" : "#64dafe", disabled: !hasActive.value },
     ],
   },
   {
     name: "设置",
     items: [
-      { label: "字体", event: "font-settings", icon: "Aa" },
-      { label: "编码", event: "encoding-settings", icon: "🌐" },
+      { label: "字体", event: "font-settings", iconComponent: FontIcon },
+      { label: "编码", event: "encoding-settings", iconComponent: EncodingIcon, activeColor: "#64dafe", disabled: !hasActive.value },
     ],
   },
   {
     name: "工具",
     items: [
-      { label: "SFTP", event: "sftp", icon: "⇄" },
-      { label: "MCP", event: "mcp-info", icon: "〽️" },
+      { label: "SFTP", event: "sftp", iconComponent: SftpIcon, activeColor: "#4ec9b0", disabled: !isSsh.value },
+      { label: "MCP", event: "mcp-info", iconComponent: McpIcon },
     ],
   },
-  { name: "帮助", items: [{ label: "关于", event: "about", icon: "ℹ" }] },
+  { name: "帮助", items: [{ label: "关于", event: "about", iconComponent: AboutIcon }] },
 ]);
+
+function iconStyle(item: MenuItem) {
+  if (item.disabled || !item.activeColor) return undefined;
+  return { color: item.activeColor };
+}
 
 const openMenu = ref<string | null>(null);
 
@@ -108,7 +122,10 @@ function onItemClick(item: MenuItem) {
           :disabled="item.disabled"
           @click="onItemClick(item)"
         >
-          <span v-if="item.icon" class="item-icon">{{ item.icon }}</span>
+          <span v-if="item.iconComponent" class="item-icon" :style="iconStyle(item)">
+            <component :is="item.iconComponent" />
+          </span>
+          <span v-else-if="item.icon" class="item-icon">{{ item.icon }}</span>
           <span class="item-label">{{ item.label }}</span>
           <span v-if="item.shortcut" class="item-shortcut">{{ item.shortcut }}</span>
         </button>

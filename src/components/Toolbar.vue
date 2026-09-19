@@ -3,9 +3,12 @@ import { computed } from "vue";
 import { useSessionStore } from "../stores/session";
 import { useSftpStore } from "../stores/sftp";
 import { getTerminalActions } from "../lib/terminalBus";
+import { useSessionLog } from "../composables/useSessionLog";
+import { AddIcon, ConnectIcon, CopyIcon, DisconnectIcon, EncodingIcon, FontIcon, LogIcon, McpIcon, PasteIcon, SftpIcon } from "./icons";
 
 const store = useSessionStore();
 const sftpStore = useSftpStore();
+const { isRecording, logTooltip, toggleLogging } = useSessionLog();
 
 const emit = defineEmits<{
   (e: "new-session"): void;
@@ -43,66 +46,76 @@ function pasteToTerminal() {
   <div class="toolbar">
     <div class="toolbar-left">
       <button class="icon-btn" title="新建" @click="emit('new-session')">
-        ➕
+        <component :is="AddIcon" />
       </button>
       <button
-        class="icon-btn"
+        class="icon-btn accent"
         title="断开"
         :disabled="!store.activeSession"
         @click="emit('disconnect')"
       >
-        ⛓️‍💥
+        <component :is="DisconnectIcon" />
       </button>
       <button
-        class="icon-btn reconnect"
+        class="icon-btn accent reconnect"
         title="重连"
         :disabled="!canReconnect"
         @click="emit('reconnect')"
       >
-        🔗
+        <component :is="ConnectIcon" />
       </button>
       <span class="divider"></span>
       <button class="icon-btn" title="字体设置" @click="emit('font-settings')">
-        Aa
+        <component :is="FontIcon" />
       </button>
       <button
-        class="icon-btn"
+        class="icon-btn accent"
         title="输出编码（当前会话）"
         :disabled="!store.activeSession"
         @click="emit('encoding-settings')"
       >
-        🌐
+        <component :is="EncodingIcon" />
       </button>
       <span class="divider"></span>
       <button
-        class="icon-btn"
+        class="icon-btn accent"
         title="复制选中内容"
         :disabled="!store.activeSession"
         @click="copySelection"
       >
-        ⧉
+        <component :is="CopyIcon" />
       </button>
       <button
-        class="icon-btn"
+        class="icon-btn accent"
         title="粘贴"
         :disabled="!store.activeSession"
         @click="pasteToTerminal"
       >
-        📋
+        <component :is="PasteIcon" />
       </button>
       <span class="divider"></span>
       <button
-        class="icon-btn sftp-btn"
+        class="icon-btn accent sftp-btn"
         title="连接 SFTP"
         :class="{ active: sftpConnected }"
         :disabled="!isSsh"
         @click="toggleSftp"
       >
-        SFTP
+        <component :is="SftpIcon" />
       </button>
       <span class="divider"></span>
       <button class="icon-btn mcp-btn" title="MCP 服务信息" @click="emit('mcp-info')">
-        MCP
+        <component :is="McpIcon" />
+      </button>
+      <span class="divider"></span>
+      <button
+        class="icon-btn log-btn"
+        :class="{ recording: isRecording }"
+        :title="logTooltip"
+        :disabled="!store.activeSession"
+        @click="toggleLogging"
+      >
+        <component :is="LogIcon" />
       </button>
     </div>
   </div>
@@ -144,6 +157,10 @@ function pasteToTerminal() {
   border-color: #555555;
 }
 
+.icon-btn.accent:not(:disabled) {
+  color: #64dafe;
+}
+
 .icon-btn:disabled {
   color: #555555;
   background: #2a2a2a;
@@ -163,9 +180,6 @@ function pasteToTerminal() {
 }
 
 .mcp-btn {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
   color: #9cdcfe;
 }
 
@@ -175,9 +189,6 @@ function pasteToTerminal() {
 }
 
 .sftp-btn {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
   color: #4ec9b0;
 }
 
@@ -188,5 +199,14 @@ function pasteToTerminal() {
 
 .sftp-btn:disabled {
   opacity: 0.4;
+}
+
+.log-btn:not(:disabled) {
+  color: #64dafe;
+}
+
+.log-btn.recording:not(:disabled) {
+  color: #ff6b6b;
+  border-color: #6a3030;
 }
 </style>

@@ -30,6 +30,10 @@ impl SerialConn {
         on_output: OutputSink,
         on_closed: ClosedSignal,
     ) -> AppResult<Self> {
+        let raw_data_bits = data_bits;
+        let raw_stop_bits = stop_bits;
+        let raw_parity = parity;
+
         let data_bits = match data_bits {
             Some(5) => DataBits::Five,
             Some(6) => DataBits::Six,
@@ -91,7 +95,16 @@ impl SerialConn {
                 })
             }
             Err(primary_err) => {
-                match win_fallback::open_blocking(path, baud, win_close_flag.clone(), on_output.clone(), on_closed) {
+                match win_fallback::open_blocking(
+                    path,
+                    baud,
+                    raw_data_bits,
+                    raw_stop_bits,
+                    raw_parity,
+                    win_close_flag.clone(),
+                    on_output.clone(),
+                    on_closed,
+                ) {
                     Ok(writer) => {
                         on_output(
                             format!(
@@ -215,6 +228,9 @@ mod win_fallback {
     pub fn open_blocking(
         path: &str,
         baud: u32,
+        data_bits: Option<u8>,
+        stop_bits: Option<u8>,
+        parity: Option<&str>,
         close_flag: Arc<AtomicBool>,
         on_output: OutputSink,
         on_closed: ClosedSignal,
@@ -247,12 +263,23 @@ mod win_fallback {
             if GetCommState(guard.0, &mut dcb) == 0 {
                 return Err(AppError::Connection(format!("{path}: GetCommState failed")));
             }
-            let current_baud = dcb.baud_rate;
 
-            // 尝试应用请求的波特率；驱动拒绝（如 CH341SER 坏驱动）则保留默认并在终端提示
-            if current_baud != baud && SetCommState(guard.0, &mut dcb) == 0 {
+            // 应用请求参数（波特率/数据位/停止位/校验 + 清零流控）；
+            // 驱动拒绝（如 CH341SER 坏驱动）则保留当前参数，并在终端提示实际生效值。
+            let requested = params_desc(baud, data_bits, stop_bits, parity);
+            dcb = apply_params(dcb, baud, data_bits, stop_bits, parity);
+            if SetCommState(guard.0, &mut dcb) == 0 {
+                let actual = {
+                    let mut d: Dcb = std::mem::zeroed();
+                    d.dcb_length = std::mem::size_of::<Dcb>() as u32;
+                    if GetCommState(guard.0, &mut d) == 0 {
+                        dcb_desc(&d)
+                    } else {
+                        "未知".to_string()
+                    }
+                };
                 let warn = format!(
-                    "\r\n\x1b[33m[警告] 串口参数应用失败，使用端口当前参数 {current_baud} 8N1\x1b[0m\r\n"
+                    "\r\n\x1b[33m[警告] 串口参数应用失败：请求 {requested}，当前实际 {actual}\x1b[0m\r\n"
                 );
                 on_output(warn.as_bytes());
             }
@@ -322,6 +349,140 @@ mod win_fallback {
                     return;
                 }
             }
+        }
+    }
+
+    // DCB flags 位（对齐 Win32 DCB 定义）
+    const FLAG_BINARY: u32 = 1; // fBinary (bit 0)
+    const FLAG_PARITY: u32 = 1 << 1; // fParity (bit 1)
+
+    const PARITY_NONE: u8 = 0;
+    const PARITY_ODD: u8 = 1;
+    const PARITY_EVEN: u8 = 2;
+    const STOP_BITS_ONE: u8 = 0;
+    const STOP_BITS_TWO: u8 = 2;
+
+    /// 把请求的串口参数写入 DCB：波特率/数据位/停止位/校验，并清零流控位
+    /// （与主路径 serialport-rs 的 `FlowControl::None` 语义对齐：CTS/DSR/软件流控全关，
+    /// RTS/DTR 均 Disable）。纯函数不接触句柄，便于单测。
+    fn apply_params(
+        mut dcb: Dcb,
+        baud: u32,
+        data_bits: Option<u8>,
+        stop_bits: Option<u8>,
+        parity: Option<&str>,
+    ) -> Dcb {
+        dcb.baud_rate = baud;
+        dcb.byte_size = match data_bits {
+            Some(5) => 5,
+            Some(6) => 6,
+            Some(7) => 7,
+            _ => 8,
+        };
+        dcb.stop_bits = match stop_bits {
+            Some(2) => STOP_BITS_TWO,
+            _ => STOP_BITS_ONE,
+        };
+        dcb.parity = match parity {
+            Some("Odd") => PARITY_ODD,
+            Some("Even") => PARITY_EVEN,
+            _ => PARITY_NONE,
+        };
+        // fBinary 必须置位；fParity 依校验位；流控位清零（RTS/DTR Disable）
+        dcb.flags = FLAG_BINARY
+            | if dcb.parity == PARITY_NONE { 0 } else { FLAG_PARITY };
+        dcb
+    }
+
+    fn parity_char(p: u8) -> char {
+        match p {
+            PARITY_ODD => 'O',
+            PARITY_EVEN => 'E',
+            3 => 'M',
+            4 => 'S',
+            _ => 'N',
+        }
+    }
+
+    fn dcb_desc(dcb: &Dcb) -> String {
+        let stop = if dcb.stop_bits == STOP_BITS_TWO { "2" } else { "1" };
+        format!("{} {}{}{}", dcb.baud_rate, dcb.byte_size, parity_char(dcb.parity), stop)
+    }
+
+    fn params_desc(baud: u32, data_bits: Option<u8>, stop_bits: Option<u8>, parity: Option<&str>) -> String {
+        let byte = match data_bits {
+            Some(5) => 5,
+            Some(6) => 6,
+            Some(7) => 7,
+            _ => 8,
+        };
+        let p = match parity {
+            Some("Odd") => 'O',
+            Some("Even") => 'E',
+            _ => 'N',
+        };
+        let stop = if stop_bits == Some(2) { "2" } else { "1" };
+        format!("{baud} {byte}{p}{stop}")
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        const FLAG_OUTX_CTS_FLOW: u32 = 1 << 2; // fOutxCtsFlow (bit 2)
+        const FLAG_OUTX_DSR_FLOW: u32 = 1 << 3; // fOutxDsrFlow (bit 3)
+        const FLAG_OUT_X: u32 = 1 << 8; // fOutX (bit 8)
+        const FLAG_IN_X: u32 = 1 << 9; // fInX (bit 9)
+
+        fn base_dcb() -> Dcb {
+            let mut dcb: Dcb = unsafe { std::mem::zeroed() };
+            dcb.dcb_length = std::mem::size_of::<Dcb>() as u32;
+            // 模拟驱动默认：9600 8N1，且带 CTS/DSR/软件流控
+            dcb.baud_rate = 9600;
+            dcb.byte_size = 8;
+            dcb.parity = PARITY_NONE;
+            dcb.stop_bits = STOP_BITS_ONE;
+            dcb.flags = FLAG_BINARY | FLAG_OUTX_CTS_FLOW | FLAG_OUTX_DSR_FLOW | FLAG_OUT_X | FLAG_IN_X;
+            dcb
+        }
+
+        #[test]
+        fn applies_requested_params_and_clears_flow_control() {
+            let dcb = apply_params(base_dcb(), 115200, Some(8), Some(1), None);
+            assert_eq!(dcb.baud_rate, 115200);
+            assert_eq!(dcb.byte_size, 8);
+            assert_eq!(dcb.stop_bits, STOP_BITS_ONE);
+            assert_eq!(dcb.parity, PARITY_NONE);
+            assert_eq!(dcb.flags & FLAG_OUTX_CTS_FLOW, 0);
+            assert_eq!(dcb.flags & FLAG_OUTX_DSR_FLOW, 0);
+            assert_eq!(dcb.flags & FLAG_OUT_X, 0);
+            assert_eq!(dcb.flags & FLAG_IN_X, 0);
+            assert_eq!(dcb.flags & FLAG_BINARY, FLAG_BINARY);
+        }
+
+        #[test]
+        fn applies_even_parity_and_two_stop_bits() {
+            let dcb = apply_params(base_dcb(), 9600, Some(7), Some(2), Some("Even"));
+            assert_eq!(dcb.byte_size, 7);
+            assert_eq!(dcb.stop_bits, STOP_BITS_TWO);
+            assert_eq!(dcb.parity, PARITY_EVEN);
+            assert_eq!(dcb.flags & FLAG_PARITY, FLAG_PARITY);
+        }
+
+        #[test]
+        fn defaults_to_8n1() {
+            let dcb = apply_params(base_dcb(), 9600, None, None, None);
+            assert_eq!(dcb.byte_size, 8);
+            assert_eq!(dcb.stop_bits, STOP_BITS_ONE);
+            assert_eq!(dcb.parity, PARITY_NONE);
+            assert_eq!(dcb.flags & FLAG_PARITY, 0);
+        }
+
+        #[test]
+        fn unsupported_parity_falls_back_to_none() {
+            let dcb = apply_params(base_dcb(), 9600, None, None, Some("Mark"));
+            assert_eq!(dcb.parity, PARITY_NONE);
+            assert_eq!(dcb.flags & FLAG_PARITY, 0);
         }
     }
 }

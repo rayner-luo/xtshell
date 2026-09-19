@@ -162,7 +162,7 @@ export function useXterm(
 
     unlistenError = await onSessionError(sessionId, (msg) => {
       if (disposed) return;
-      term.write(`\r\n\x1b[31m[错误] ${msg}\x1b[0m\r\n`);
+      term.write(`\r\n\x1b[31m${msg}\x1b[0m\r\n`);
       onError(msg);
     });
     if (disposed) {

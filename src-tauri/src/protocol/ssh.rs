@@ -3,6 +3,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use russh::client;
 use russh::keys::PrivateKeyWithHashAlg;
+use russh::{Preferred, cipher as ssh_cipher, kex as ssh_kex, mac as ssh_mac};
 
 use crate::error::{AppError, AppResult};
 use crate::protocol::{ClosedSignal, OutputSink, TerminalStream};
@@ -17,6 +18,17 @@ impl client::Handler for ClientHandler {
     ) -> Result<bool, Self::Error> {
         Ok(true)
     }
+}
+
+/// 将 russh 连接错误映射为友好提示：底层 IO 超时（WSA 10060 / Linux 110）统一为
+/// AppError::ConnectTimeout（"连接超时，请重试"），其余保留原文。
+fn connect_err(e: russh::Error) -> AppError {
+    if let russh::Error::IO(ref io) = e {
+        if matches!(io.raw_os_error(), Some(10060) | Some(110)) {
+            return AppError::ConnectTimeout;
+        }
+    }
+    AppError::Connection(e.to_string())
 }
 
 /// SSH client 句柄共享槽位：终端流与 SFTP 通道共用（close 时取走并断开）
@@ -40,13 +52,30 @@ impl SshStream {
         on_output: OutputSink,
         on_closed: ClosedSignal,
     ) -> AppResult<Self> {
+        let mut preferred = Preferred::default();
+        preferred.kex.to_mut().extend([
+            ssh_kex::DH_G14_SHA1,
+            ssh_kex::DH_GEX_SHA1,
+            ssh_kex::DH_G1_SHA1,
+        ]);
+        preferred.cipher.to_mut().extend([
+            ssh_cipher::AES_192_CBC,
+            ssh_cipher::AES_128_CBC,
+            ssh_cipher::AES_256_CBC,
+            ssh_cipher::TRIPLE_DES_CBC,
+        ]);
+        preferred
+            .mac
+            .to_mut()
+            .extend([ssh_mac::HMAC_SHA1_ETM, ssh_mac::HMAC_SHA1]);
         let config = std::sync::Arc::new(client::Config {
+            preferred,
             inactivity_timeout: Some(Duration::from_secs(60)),
             keepalive_interval: Some(Duration::from_secs(30)),
             ..Default::default()
         });
         let mut handle = client::connect(config, (host, port), ClientHandler).await
-            .map_err(|e| AppError::Connection(e.to_string()))?;
+            .map_err(connect_err)?;
 
         Self::authenticate(&mut handle, username, password, private_key, private_key_passphrase).await?;
 

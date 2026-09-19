@@ -19,10 +19,12 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSessionStore } from "./stores/session";
 import { useProfilesStore } from "./stores/profiles";
+import { useSessionLog } from "./composables/useSessionLog";
 import { onSessionsChanged, onProfilesChanged } from "./lib/api";
 
 const store = useSessionStore();
 const sftpStore = useSftpStore();
+const sessionLog = useSessionLog();
 
 function onMenuSftp() {
   const id = store.activeId;
@@ -118,6 +120,7 @@ onBeforeUnmount(() => {
       @copy="menuCopy"
       @paste="menuPaste"
       @reconnect="reconnect"
+      @toggle-log="sessionLog.toggleLogging"
       @exit="quitApp"
       @about="showAbout = true"
     />

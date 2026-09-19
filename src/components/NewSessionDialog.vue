@@ -166,6 +166,9 @@ async function submit() {
     } else if (protocol.value === "telnet") {
       config.host = host.value.trim();
       config.port = port.value;
+      const telnetUser = username.value.trim();
+      config.username = telnetUser ? telnetUser : undefined;
+      config.password = password.value ? password.value : undefined;
     } else {
       config.serial_port = serialPort.value.trim();
       config.baud_rate = baudRate.value;
@@ -257,7 +260,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @click.self="close">
+    <div v-if="open" class="overlay">
       <div class="dialog">
         <div class="dialog-header">
           <span class="dialog-title">{{ dialogTitle }}</span>
@@ -289,6 +292,15 @@ onBeforeUnmount(() => {
                 :max="65535"
               />
             </div>
+            <div v-if="protocol === 'telnet'" class="form-row">
+              <label class="form-label">账号</label>
+              <input v-model="username" class="form-input" placeholder="root" />
+            </div>
+            <div v-if="protocol === 'telnet'" class="form-row">
+              <label class="form-label">密码</label>
+              <input v-model="password" class="form-input" type="password" />
+            </div>
+
             <div v-if="protocol === 'ssh'" class="form-row">
               <label class="form-label required">用户名</label>
               <input v-model="username" class="form-input" placeholder="root" />

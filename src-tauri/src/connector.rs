@@ -39,6 +39,8 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
         "telnet" => telnet::TelnetStream::connect(
             &cfg.host.clone().unwrap_or_default(),
             cfg.port.unwrap_or(23),
+            cfg.username.clone(),
+            cfg.password.clone(),
             sink,
             closed,
         )
@@ -65,7 +67,7 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
         }
         Err(e) => {
             let mut guard = mgr.lock().await;
-            let _ = guard.inject_output_no_sink(&id, format!("[错误] {}\r\n", e).as_bytes());
+            let _ = guard.inject_output_no_sink(&id, format!("{}\r\n", e).as_bytes());
             let _ = guard.mark_closed(&id);
             let _ = app.emit(&format!("session-error-{id}"), e.to_string());
             let _ = app.emit("sessions-changed", ());

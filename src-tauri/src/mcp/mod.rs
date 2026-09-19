@@ -3,16 +3,20 @@ use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
-    transport::streamable_http_server::{StreamableHttpService, session::local::LocalSessionManager},
+    transport::streamable_http_server::{
+        StreamableHttpService, session::never::NeverSessionManager, tower::StreamableHttpServerConfig,
+    },
 };
 use tauri::{AppHandle, Emitter};
 
 use crate::session::manager::{SessionConfig, SharedManager};
+use crate::profile::SharedProfiles;
 
 #[derive(Clone)]
 pub struct McpServer {
     tool_router: ToolRouter<Self>,
     mgr: SharedManager,
+    profiles: SharedProfiles,
     app: AppHandle,
 }
 
@@ -44,6 +48,14 @@ pub struct SendParams {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct ConnectProfileParams {
+    pub id: String,
+    pub password: Option<String>,
+    pub passphrase: Option<String>,
+    pub private_key: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct GetOutputParams {
     pub session_id: String,
     pub offset: Option<u64>,
@@ -52,8 +64,8 @@ pub struct GetOutputParams {
 
 #[tool_router(router = tool_router)]
 impl McpServer {
-    fn new(mgr: SharedManager, app: AppHandle) -> Self {
-        Self { tool_router: Self::tool_router(), mgr, app }
+    fn new(mgr: SharedManager, profiles: SharedProfiles, app: AppHandle) -> Self {
+        Self { tool_router: Self::tool_router(), mgr, profiles, app }
     }
 
     #[tool(description = "Create a new SSH/Telnet/Serial session. Returns JSON {session_id}. protocol: ssh|telnet|serial")]
@@ -103,6 +115,31 @@ impl McpServer {
     async fn list_sessions(&self) -> Result<CallToolResult, ErrorData> {
         let v = self.mgr.lock().await.list();
         Ok(tool_text(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())))
+    }
+
+    #[tool(description = "List saved session profiles as JSON {folders:[{id,name,parent}],sessions:[{id,name,protocol,host,port,username,auth_mode,has_password,has_passphrase,folder,encoding}]}. Only has_password booleans, never credentials. Use connect_profile to launch one.")]
+    async fn list_profiles(&self) -> Result<CallToolResult, ErrorData> {
+        let tree = self.profiles.lock().await.tree();
+        Ok(tool_text(serde_json::to_string(&tree).unwrap_or_else(|_| "{}".into())))
+    }
+
+    #[tool(description = "Launch a saved session profile by id. Stored credentials (remember=true) are used automatically; pass password/passphrase/private_key only as overrides when the profile has none. Returns JSON {session_id}. Then use send_input/get_output on it.")]
+    async fn connect_profile(
+        &self,
+        Parameters(p): Parameters<ConnectProfileParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let session_id = crate::commands::launch_session_from_profile(
+            self.app.clone(),
+            self.profiles.clone(),
+            self.mgr.clone(),
+            p.id.clone(),
+            p.password.clone(),
+            p.passphrase.clone(),
+            p.private_key.clone(),
+        )
+        .await
+        .map_err(|e| ErrorData::internal_error(e.message, None))?;
+        Ok(tool_text(format!("{{\"session_id\":\"{session_id}\"}}")))
     }
 
     #[tool(description = "Send input text to a session (append \\n yourself to press Enter)")]
@@ -159,13 +196,21 @@ fn map_err(e: crate::error::AppError) -> ErrorData {
 
 pub async fn serve_mcp(
     mgr: SharedManager,
+    profiles: SharedProfiles,
     app: AppHandle,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // 无状态模式：不要求 Mcp-Session-Id，每个 POST 独立处理（不先 initialize
+    // 直接 tools/list 也能工作），对简易 agent 客户端最兼容；工具本身无会话
+    // 语义（会话状态在 SessionManager 全局注册表中）。
+    // json_response=true：普通请求-响应工具直接回 application/json，
+    // 简易客户端无需解析 SSE 流。
     let service = StreamableHttpService::new(
-        move || Ok(McpServer::new(mgr.clone(), app.clone())),
-        LocalSessionManager::default().into(),
-        Default::default(),
+        move || Ok(McpServer::new(mgr.clone(), profiles.clone(), app.clone())),
+        NeverSessionManager::default().into(),
+        StreamableHttpServerConfig::default()
+            .with_legacy_session_mode(false)
+            .with_json_response(true),
     );
     let router = axum::Router::new().nest_service("/mcp", service);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;

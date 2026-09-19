@@ -42,9 +42,13 @@ pub fn run() {
             app.manage(Arc::new(Mutex::new(store)) as profile::SharedProfiles);
 
             let mgr2 = mgr.clone();
+            let profiles2 = app
+                .state::<profile::SharedProfiles>()
+                .inner()
+                .clone();
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = mcp::serve_mcp(mgr2, handle, 46543).await {
+                if let Err(e) = mcp::serve_mcp(mgr2, profiles2, handle, 46543).await {
                     eprintln!("mcp server failed: {e}");
                 }
             });

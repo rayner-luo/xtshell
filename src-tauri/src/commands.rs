@@ -172,10 +172,12 @@ pub async fn delete_profile(
 }
 
 #[tauri::command]
-pub async fn launch_profile(
+/// 从已保存 profile 启动会话（Tauri command 与 MCP 共用）。
+/// 已保存凭据由 build_session_config 自动解密；显式参数仅作覆盖。
+pub async fn launch_session_from_profile(
     app: AppHandle,
-    profiles: State<'_, SharedProfiles>,
-    mgr: State<'_, SharedManager>,
+    profiles: SharedProfiles,
+    mgr: SharedManager,
     id: String,
     password: Option<String>,
     passphrase: Option<String>,
@@ -199,10 +201,23 @@ pub async fn launch_profile(
     let session_id = mgr.lock().await.create(config.clone());
     // 立即通知前端刷新：连接中的 tab 即时可见
     let _ = app.emit("sessions-changed", ());
-    let mgr2 = (*mgr).clone();
+    let mgr2 = mgr.clone();
     let id2 = session_id.clone();
     tauri::async_runtime::spawn(crate::connector::connect_session(mgr2, id2, config, app));
     Ok(session_id)
+}
+
+#[tauri::command]
+pub async fn launch_profile(
+    app: AppHandle,
+    profiles: State<'_, SharedProfiles>,
+    mgr: State<'_, SharedManager>,
+    id: String,
+    password: Option<String>,
+    passphrase: Option<String>,
+    private_key: Option<String>,
+) -> Result<SessionId, ApiError> {
+    launch_session_from_profile(app, (*profiles).clone(), (*mgr).clone(), id, password, passphrase, private_key).await
 }
 
 #[tauri::command]

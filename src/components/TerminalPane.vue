@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 import { useSessionStore } from "../stores/session";
 import { useProfilesStore } from "../stores/profiles";
 import type { SessionInfo } from "../types/session";
 import TerminalTab from "./TerminalTab.vue";
-import { setSessionLog } from "../lib/api";
-import { open as pickDir } from "@tauri-apps/plugin-dialog";
 
 const store = useSessionStore();
 const profilesStore = useProfilesStore();
@@ -15,6 +13,10 @@ const emit = defineEmits<{
 }>();
 
 const tabRefs = ref<Map<string, InstanceType<typeof TerminalTab>>>(new Map());
+const stripRef = ref<HTMLElement | null>(null);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
+let scrollObserver: ResizeObserver | null = null;
 
 function baseTitle(s: SessionInfo): string {
   const pid = profilesStore.launchedFrom[s.id];
@@ -55,14 +57,61 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+function updateScrollArrows() {
+  const strip = stripRef.value;
+  if (!strip) return;
+  canScrollLeft.value = strip.scrollLeft > 1;
+  canScrollRight.value =
+    strip.scrollWidth > strip.clientWidth + 1 &&
+    strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1;
+}
+
+function scrollStrip(direction: -1 | 1) {
+  stripRef.value?.scrollBy({ left: direction * 220, behavior: "smooth" });
+}
+
+function scrollToActiveTab() {
+  const strip = stripRef.value;
+  const active = strip?.querySelector<HTMLElement>(".tab.active");
+  if (!strip || !active) return;
+  active.scrollIntoView({ inline: "start", block: "nearest", behavior: "smooth" });
+}
+
 onMounted(() => {
   window.addEventListener("keydown", onKeydown);
   void store.refresh();
+  if (typeof ResizeObserver !== "undefined" && stripRef.value) {
+    scrollObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => updateScrollArrows());
+    });
+    scrollObserver.observe(stripRef.value);
+  }
+  void nextTick(updateScrollArrows);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
+  scrollObserver?.disconnect();
+  scrollObserver = null;
 });
+
+watch(
+  () => store.activeId,
+  async () => {
+    await nextTick();
+    scrollToActiveTab();
+    updateScrollArrows();
+  },
+);
+
+watch(
+  () => store.sessions.length,
+  async () => {
+    await nextTick();
+    updateScrollArrows();
+    if (store.activeId) scrollToActiveTab();
+  },
+);
 
 function closeTab(id: string) {
   void store.close(id);
@@ -73,60 +122,49 @@ function stateIcon(state: string): string {
   return state === "connected" ? "✓" : state === "closed" ? "✗" : "◌";
 }
 
-async function toggleLogging() {
-  const id = store.activeId;
-  if (!id) return;
-  const current = store.logging[id];
-  try {
-    if (current) {
-      await setSessionLog(id, null);
-      store.setLogging(id, null);
-    } else {
-      const dir = await pickDir({
-        directory: true,
-        title: "选择会话日志保存目录",
-      });
-      if (!dir) return;
-      const path = await setSessionLog(id, dir);
-      store.setLogging(id, path ?? null);
-    }
-  } catch {
-    /* 选目录取消或命令失败时静默 */
-  }
-}
 </script>
 
 <template>
   <div class="terminal-pane">
     <div class="tab-bar">
-      <div
-        v-for="s in store.sessions"
-        :key="s.id"
-        class="tab"
-        :class="{ active: s.id === store.activeId }"
-        @click="store.setActive(s.id)"
-      >
-        <span class="tab-state" :class="s.state">{{ stateIcon(s.state) }}</span>
-        <span class="tab-label" :title="tabTooltip(s)">
-          {{ tabTitles.get(s.id) ?? s.target }}
-        </span>
-        <button class="tab-close" @click.stop="closeTab(s.id)">✕</button>
-      </div>
-      <span class="spacer"></span>
       <button
-        v-if="store.activeSession"
-        class="log-btn"
-        :class="{ recording: store.logging[store.activeId!] }"
-        :title="store.logging[store.activeId!] ? `停止记录\n${store.logging[store.activeId!]}` : '记录会话日志'"
-        @click="toggleLogging"
+        v-if="store.sessions.length"
+        class="tab-arrow"
+        title="向左滚动标签页"
+        :disabled="!canScrollLeft"
+        @click="scrollStrip(-1)"
       >
-        ●
+        ‹
+      </button>
+      <div ref="stripRef" class="tab-strip" @scroll.passive="updateScrollArrows">
+        <div
+          v-for="s in store.sessions"
+          :key="s.id"
+          class="tab"
+          :class="{ active: s.id === store.activeId }"
+          @click="store.setActive(s.id)"
+        >
+          <span class="tab-state" :class="s.state">{{ stateIcon(s.state) }}</span>
+          <span class="tab-label" :title="tabTooltip(s)">
+            {{ tabTitles.get(s.id) ?? s.target }}
+          </span>
+          <button class="tab-close" @click.stop="closeTab(s.id)">✕</button>
+        </div>
+      </div>
+      <button
+        v-if="store.sessions.length"
+        class="tab-arrow"
+        title="向右滚动标签页"
+        :disabled="!canScrollRight"
+        @click="scrollStrip(1)"
+      >
+        ›
       </button>
     </div>
     <div v-if="store.sessions.length === 0" class="empty-state">
       <div class="empty-hint">
         <div class="empty-icon">⌨</div>
-        <div>新建会话开始使用 (Ctrl+N)</div>
+        <div>新建会话 (Ctrl+N)</div>
       </div>
     </div>
     <div v-else class="tab-content">
@@ -158,8 +196,26 @@ async function toggleLogging() {
   height: 28px;
   background: #181818;
   border-bottom: 1px solid #2a2a2a;
-  overflow-x: auto;
   flex-shrink: 0;
+}
+
+.tab-arrow {
+  width: 36px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 28px;
+  text-align: center;
+  color: #cccccc;
+  background: #181818;
+  border: none;
+  border-right: 1px solid #2a2a2a;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tab-arrow:disabled {
+  color: #555555;
+  cursor: default;
 }
 
 .tab {
@@ -185,40 +241,17 @@ async function toggleLogging() {
   border-bottom: 2px solid #4ec9b0;
 }
 
-.spacer {
+.tab-strip {
+  display: flex;
+  align-items: stretch;
   flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.log-btn {
-  width: 22px;
-  height: 20px;
-  margin-right: 8px;
-  font-size: 12px;
-  line-height: 1;
-  color: #777777;
-  background: transparent;
-  border: 1px solid #3c3c3c;
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  align-self: center;
-}
-
-.log-btn:hover {
-  color: #ffffff;
-  border-color: #555555;
-}
-
-.log-btn.recording {
-  color: #ff6b6b;
-  border-color: #6a3030;
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.45;
-  }
+.tab-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-state {

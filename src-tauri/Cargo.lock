@@ -4225,8 +4225,6 @@ dependencies = [
 [[package]]
 name = "russh"
 version = "0.61.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbf893f64684e58da8a68d56a5e84d1cf0440226274c515770fe267707a7d0b0"
 dependencies = [
  "aes 0.9.3",
  "aws-lc-rs",
@@ -4242,6 +4240,7 @@ dependencies = [
  "data-encoding",
  "delegate",
  "der",
+ "des",
  "digest 0.11.3",
  "ecdsa",
  "ed25519-dalek",
@@ -4964,8 +4963,6 @@ dependencies = [
 [[package]]
 name = "ssh-encoding"
 version = "0.3.0-rc.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7abf34aa716da5d5b4c496936d042ea282ab392092cd68a72ef6a8863ff8c96a"
 dependencies = [
  "base64ct",
  "bytes",
@@ -7027,7 +7024,7 @@ checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
 name = "xtshell"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "aes-gcm 0.10.3",
  "async-trait",

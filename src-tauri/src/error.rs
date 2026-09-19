@@ -6,10 +6,22 @@ pub enum AppError {
     SessionNotFound(String),
     #[error("unsupported protocol: {0}")]
     UnsupportedProtocol(String),
-    #[error("connection error: {0}")]
+    #[error("{0}")]
     Connection(String),
-    #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("连接超时，请重试")]
+    ConnectTimeout,
+    #[error("{0}")]
+    Io(std::io::Error),
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(e: std::io::Error) -> Self {
+        match e.raw_os_error() {
+            // Windows WSAETIMEDOUT / Linux ETIMEDOUT：底层 OS 文案冗长，统一为友好提示
+            Some(10060) | Some(110) => Self::ConnectTimeout,
+            _ => Self::Io(e),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

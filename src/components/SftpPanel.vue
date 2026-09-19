@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useSessionStore } from "../stores/session";
 import { useSftpStore } from "../stores/sftp";
 import { openCtxMenu } from "../composables/contextMenu";
+import { FolderIcon } from "./icons";
 import type { SftpEntry } from "../lib/api";
 
 const sessionStore = useSessionStore();
@@ -163,7 +164,7 @@ function progressPct(): number {
         <div class="sftp-list" @contextmenu.prevent="panelMenu">
           <div v-if="st.loading && st.entries.length === 0" class="sftp-hint">加载中…</div>
           <div v-if="st.cwd !== '/'" class="sftp-entry parent-entry" @dblclick="gotoParent">
-            <span class="entry-icon">📁</span>
+            <component class="entry-icon" :is="FolderIcon" />
             <span class="entry-name">..</span>
             <span class="entry-size"></span>
           </div>
@@ -178,7 +179,9 @@ function progressPct(): number {
               :title="e.name"
               @contextmenu.prevent.stop="entryNameMenu($event, e)"
             >
-              {{ e.is_dir ? "📁" : "📄" }} {{ e.name }}
+              <component v-if="e.is_dir" :is="FolderIcon" />
+              <template v-else>📄</template>
+              {{ e.name }}
             </span>
             <span
               class="entry-size"
