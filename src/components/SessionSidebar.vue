@@ -38,6 +38,7 @@ onMounted(async () => {
 
 function sidebarMenu(e: MouseEvent) {
   openCtxMenu(e, [
+    { label: "新建连接", action: () => profilesStore.openNew(null) },
     {
       label: "新建目录",
       action: () => profilesStore.newFolder("新建目录", null),
@@ -125,8 +126,8 @@ async function onRootDrop(e: DragEvent) {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #232323;
-  border-right: 1px solid #2e2e2e;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-divider);
   overflow: hidden;
   transition: width 0.15s ease;
 }
@@ -140,24 +141,24 @@ async function onRootDrop(e: DragEvent) {
   align-items: center;
   height: 28px;
   flex-shrink: 0;
-  background: #1d1d1d;
-  border-bottom: 1px solid #2e2e2e;
+  background: var(--bg-tabbar);
+  border-bottom: 1px solid var(--border-divider);
 }
 
 .panel-tab {
   padding: 0 12px;
   height: 100%;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
 .panel-tab.active {
-  color: #ffffff;
-  background: #232323;
-  box-shadow: inset 0 -2px 0 #4ec9b0;
+  color: var(--text-primary);
+  background: var(--bg-sidebar);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .panel-tab:disabled {
@@ -170,15 +171,15 @@ async function onRootDrop(e: DragEvent) {
   width: 24px;
   height: 100%;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
 .collapse-btn:hover {
-  color: #ffffff;
-  background: #333333;
+  color: var(--text-primary);
+  background: var(--border-subtle);
 }
 
 .panel-body {
@@ -197,7 +198,7 @@ async function onRootDrop(e: DragEvent) {
 
 .sec.grow {
   flex: 1;
-  border-top: 1px solid #2e2e2e;
+  border-top: 1px solid var(--border-divider);
 }
 
 .sec-title {
@@ -206,7 +207,7 @@ async function onRootDrop(e: DragEvent) {
   justify-content: space-between;
   padding: 2px 10px 6px;
   font-size: 11px;
-  color: #777777;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -214,7 +215,7 @@ async function onRootDrop(e: DragEvent) {
 .sec-empty {
   padding: 4px 10px;
   font-size: 11px;
-  color: #666666;
+  color: var(--text-disabled);
 }
 
 .tree-root {
@@ -247,8 +248,8 @@ async function onRootDrop(e: DragEvent) {
 .sidebar-error {
   padding: 4px 10px;
   font-size: 11px;
-  color: #ff8a8a;
-  background: #3a1f1f;
+  color: var(--danger-bright);
+  background: var(--bg-danger-tint);
   flex-shrink: 0;
 }
 
@@ -261,17 +262,17 @@ async function onRootDrop(e: DragEvent) {
   width: 100%;
   height: 100%;
   cursor: pointer;
-  background: #232323;
+  background: var(--bg-sidebar);
 }
 
 .collapsed-strip:hover {
-  background: #282828;
+  background: var(--bg-hover-soft);
 }
 
 .vtext {
   writing-mode: vertical-rl;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-muted);
   white-space: nowrap;
   max-height: 130px;
   overflow: hidden;
@@ -279,7 +280,7 @@ async function onRootDrop(e: DragEvent) {
 }
 
 .vtext.head {
-  color: #4ec9b0;
+  color: var(--accent);
   font-weight: 600;
 }
 

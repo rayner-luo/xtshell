@@ -23,13 +23,28 @@ import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { registerTerminalActions, unregisterTerminalActions } from "../lib/terminalBus";
 import { useSessionStore, type Encoding } from "../stores/session";
-import { useSettingsStore } from "../stores/settings";
+import { useSettingsStore, type ThemeName } from "../stores/settings";
 import { useZmodemStore } from "../stores/zmodem";
 
 export interface XtermHandles {
   term: Terminal;
   fit: () => void;
 }
+
+// 终端配色独立于窗口 UI：深浅两套，随应用主题切换
+const TERMINAL_THEMES: Record<ThemeName, import("@xterm/xterm").ITheme> = {
+  dark: {
+    background: "#1e1e1e",
+    foreground: "#d4d4d4",
+  },
+  light: {
+    background: "#f2f2f3",
+    foreground: "#333336",
+    cursor: "#333336",
+    cursorAccent: "#f2f2f3",
+    selectionBackground: "#c9c9ce",
+  },
+};
 
 export function useXterm(
   sessionId: string,
@@ -44,10 +59,7 @@ export function useXterm(
     cursorBlink: true,
     fontSize: settings.fontSize,
     fontFamily: settings.fontFamily,
-    theme: {
-      background: "#1e1e1e",
-      foreground: "#d4d4d4",
-    },
+    theme: TERMINAL_THEMES[settings.theme],
   });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
@@ -289,11 +301,12 @@ export function useXterm(
   );
 
   watch(
-    () => [settings.fontFamily, settings.fontSize] as const,
-    ([family, size]) => {
+    () => [settings.fontFamily, settings.fontSize, settings.theme] as const,
+    ([family, size, theme]) => {
       if (disposed) return;
       term.options.fontFamily = family;
       term.options.fontSize = size;
+      term.options.theme = TERMINAL_THEMES[theme];
       fit();
     },
   );

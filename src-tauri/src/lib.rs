@@ -27,6 +27,8 @@ pub fn run() {
         .manage(zmodem::ZmodemRegistry::default())
         .manage(sftp::SftpRegistry::default())
         .setup(move |app| {
+            // 原生弹出（select 下拉等）默认浅色，与默认主题一致；
+            // 深色用户由前端加载后经 set_native_theme 切换。
             let dir = app
                 .path()
                 .app_data_dir()
@@ -64,6 +66,7 @@ pub fn run() {
             commands::reconnect_session,
             commands::list_serial_ports,
             commands::set_session_log,
+            commands::set_native_theme,
             commands::list_profiles,
             commands::save_profile,
             commands::delete_profile,

@@ -187,15 +187,15 @@ function stateIcon(state: string): string {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  background: #1e1e1e;
+  background: var(--bg-app);
 }
 
 .tab-bar {
   display: flex;
   align-items: stretch;
   height: 28px;
-  background: #181818;
-  border-bottom: 1px solid #2a2a2a;
+  background: var(--bg-tabbar);
+  border-bottom: 1px solid var(--border-divider);
   flex-shrink: 0;
 }
 
@@ -205,16 +205,16 @@ function stateIcon(state: string): string {
   font-size: 14px;
   line-height: 28px;
   text-align: center;
-  color: #cccccc;
-  background: #181818;
+  color: var(--text-secondary);
+  background: var(--bg-tabbar);
   border: none;
-  border-right: 1px solid #2a2a2a;
+  border-right: 1px solid var(--border-divider);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .tab-arrow:disabled {
-  color: #555555;
+  color: var(--text-disabled);
   cursor: default;
 }
 
@@ -224,21 +224,21 @@ function stateIcon(state: string): string {
   gap: 6px;
   padding: 0 8px 0 12px;
   font-size: 12px;
-  color: #999999;
-  background: #1e1e1e;
-  border-right: 1px solid #2a2a2a;
+  color: var(--text-muted);
+  background: var(--bg-app);
+  border-right: 1px solid var(--border-divider);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .tab:hover {
-  color: #cccccc;
+  color: var(--text-secondary);
 }
 
 .tab.active {
-  color: #ffffff;
-  background: #1e1e1e;
-  border-bottom: 2px solid #4ec9b0;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  border-bottom: 2px solid var(--accent);
 }
 
 .tab-strip {
@@ -261,15 +261,15 @@ function stateIcon(state: string): string {
 }
 
 .tab-state.connected {
-  color: #4ec9b0;
+  color: var(--accent);
 }
 
 .tab-state.connecting {
-  color: #e5c07b;
+  color: var(--warning);
 }
 
 .tab-state.closed {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .tab-label {
@@ -286,7 +286,7 @@ function stateIcon(state: string): string {
   font-size: 10px;
   line-height: 16px;
   text-align: center;
-  color: #999999;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   border-radius: 3px;
@@ -294,8 +294,8 @@ function stateIcon(state: string): string {
 }
 
 .tab-close:hover {
-  color: #ffffff;
-  background: #444444;
+  color: var(--text-primary);
+  background: var(--border-strong);
 }
 
 .tab-content {
@@ -319,13 +319,13 @@ function stateIcon(state: string): string {
 
 .empty-hint {
   text-align: center;
-  color: #666666;
+  color: var(--text-disabled);
   font-size: 14px;
 }
 
 .empty-icon {
   font-size: 40px;
   margin-bottom: 12px;
-  color: #444444;
+  color: var(--border-strong);
 }
 </style>

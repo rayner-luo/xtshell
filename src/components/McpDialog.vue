@@ -72,8 +72,8 @@ function close() {
 
 .dialog {
   width: 420px;
-  background: #252525;
-  border: 1px solid #3c3c3c;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
@@ -83,20 +83,20 @@ function close() {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dialog-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .dialog-close {
   width: 22px;
   height: 22px;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -104,8 +104,8 @@ function close() {
 }
 
 .dialog-close:hover {
-  color: #ffffff;
-  background: #3c3c3c;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .dialog-body {
@@ -118,9 +118,9 @@ function close() {
   font-family: Consolas, "Courier New", monospace;
   font-size: 12px;
   line-height: 1.5;
-  color: #4ec9b0;
-  background: #1e1e1e;
-  border: 1px solid #333333;
+  color: var(--accent);
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   white-space: pre;
   overflow-x: auto;
@@ -129,22 +129,22 @@ function close() {
 .hint-text {
   margin-top: 10px;
   font-size: 11px;
-  color: #777777;
+  color: var(--text-faint);
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   padding: 12px 16px;
-  border-top: 1px solid #333333;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .btn.primary {
   padding: 6px 18px;
   font-size: 12px;
-  color: #1e1e1e;
-  background: #4ec9b0;
-  border: 1px solid #4ec9b0;
+  color: var(--bg-app);
+  background: var(--accent);
+  border: 1px solid var(--accent);
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;

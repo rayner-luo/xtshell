@@ -128,8 +128,8 @@ function pasteToTerminal() {
   justify-content: space-between;
   height: 40px;
   padding: 0 8px;
-  background: #252525;
-  border-bottom: 1px solid #1a1a1a;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--bg-input);
   flex-shrink: 0;
 }
 
@@ -145,56 +145,56 @@ function pasteToTerminal() {
   align-items: center;
   justify-content: center;
   font-size: 15px;
-  color: #cccccc;
-  background: #333333;
-  border: 1px solid #444444;
+  color: var(--text-secondary);
+  background: var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .icon-btn:hover:not(:disabled) {
-  background: #3c3c3c;
-  border-color: #555555;
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .icon-btn.accent:not(:disabled) {
-  color: #64dafe;
+  color: var(--icon-accent);
 }
 
 .icon-btn:disabled {
-  color: #555555;
-  background: #2a2a2a;
+  color: var(--text-disabled);
+  background: var(--border-divider);
   cursor: default;
 }
 
 .icon-btn.reconnect:hover:not(:disabled) {
-  color: #4ec9b0;
-  border-color: #2a5a50;
+  color: var(--accent);
+  border-color: var(--accent-border);
 }
 
 .divider {
   width: 1px;
   height: 18px;
   margin: 0 4px;
-  background: #444444;
+  background: var(--border-strong);
 }
 
 .mcp-btn {
-  color: #9cdcfe;
+  color: var(--accent-blue);
 }
 
 .mcp-btn:hover {
-  border-color: #2a5a78;
-  color: #c8e6ff;
+  border-color: var(--accent-blue-border);
+  color: var(--accent-blue-bright);
 }
 
 .sftp-btn {
-  color: #4ec9b0;
+  color: var(--accent);
 }
 
 .sftp-btn.active {
-  color: #1e1e1e;
-  background: #4ec9b0;
+  color: var(--bg-app);
+  background: var(--accent);
 }
 
 .sftp-btn:disabled {
@@ -202,11 +202,11 @@ function pasteToTerminal() {
 }
 
 .log-btn:not(:disabled) {
-  color: #64dafe;
+  color: var(--icon-accent);
 }
 
 .log-btn.recording:not(:disabled) {
-  color: #ff6b6b;
-  border-color: #6a3030;
+  color: var(--danger);
+  border-color: var(--danger-border);
 }
 </style>

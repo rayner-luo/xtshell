@@ -95,7 +95,7 @@ impl TelnetStream {
         on_closed: ClosedSignal,
     ) -> AppResult<Self> {
         let stream = TcpStream::connect((host, port)).await
-            .map_err(AppError::from)?;
+            .map_err(|e| AppError::map_connect_io(e, host))?;
         let (mut reader, writer) = stream.into_split();
         let writer = Arc::new(Mutex::new(Some(writer)));
         let mut parser = TelnetParser::new();

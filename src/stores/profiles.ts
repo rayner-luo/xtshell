@@ -21,6 +21,8 @@ export const useProfilesStore = defineStore("profiles", () => {
   const expanded = ref<Set<string>>(new Set());
   const error = ref<string | null>(null);
   const editingProfile = ref<ProfileSessionView | null>(null);
+  // 右键目录发起的“新建连接”，让对话框把首次保存的档案放入该目录
+  const pendingNewFolderId = ref<string | null>(null);
   const launchedFrom = ref<Record<string, string>>({});
   // 连接前认证弹框（密码/私钥缺失时）
   const authPromptId = ref<string | null>(null);
@@ -54,6 +56,11 @@ export const useProfilesStore = defineStore("profiles", () => {
 
   function clearEdit() {
     editingProfile.value = null;
+  }
+
+  function openNew(folderId: string | null) {
+    pendingNewFolderId.value = folderId;
+    window.dispatchEvent(new CustomEvent("xtshell:new-session"));
   }
 
   async function refresh() {
@@ -237,9 +244,11 @@ export const useProfilesStore = defineStore("profiles", () => {
     expanded,
     error,
     editingProfile,
+    pendingNewFolderId,
     launchedFrom,
     authPromptId,
     openEdit,
+    openNew,
     clearEdit,
     linkSession,
     refresh,

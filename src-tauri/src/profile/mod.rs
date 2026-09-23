@@ -488,7 +488,14 @@ mod tests {
     use super::*;
 
     fn store() -> ProfileStore {
-        let dir = std::env::temp_dir().join(format!("xtshell-profile-{}", std::process::id()));
+        // 并行测试各自拿独立目录：共用目录时一个测试 remove_dir_all 会删掉
+        // 另一个测试正在用的 secret.key，导致解密偶发失败。
+        static SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "xtshell-profile-{}-{}",
+            std::process::id(),
+            SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         ProfileStore::open(&dir).unwrap()
     }

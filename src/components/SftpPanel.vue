@@ -241,17 +241,17 @@ function progressPct(): number {
 .sbtn {
   padding: 3px 8px;
   font-size: 11px;
-  color: #cccccc;
-  background: #2d2d2d;
-  border: 1px solid #444444;
+  color: var(--text-secondary);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .sbtn:hover:not(:disabled) {
-  background: #3c3c3c;
-  color: #ffffff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .sbtn:disabled {
@@ -260,9 +260,9 @@ function progressPct(): number {
 }
 
 .sbtn.primary {
-  color: #1e1e1e;
-  background: #4ec9b0;
-  border-color: #4ec9b0;
+  color: var(--bg-app);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
@@ -278,7 +278,7 @@ function progressPct(): number {
   flex: 1;
   min-width: 0;
   font-size: 11px;
-  color: #888888;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -290,7 +290,7 @@ function progressPct(): number {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border-top: 1px solid #2e2e2e;
+  border-top: 1px solid var(--border-divider);
   scrollbar-width: thin;
   scrollbar-color: rgba(121, 121, 121, 0.4) transparent;
 }
@@ -319,17 +319,17 @@ function progressPct(): number {
   gap: 6px;
   padding: 3px 10px;
   font-size: 12px;
-  color: #cccccc;
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
 }
 
 .sftp-entry:hover {
-  background: #2f2f2f;
+  background: var(--bg-raised);
 }
 
 .parent-entry .entry-name {
-  color: #999999;
+  color: var(--text-muted);
 }
 
 .entry-name {
@@ -343,7 +343,7 @@ function progressPct(): number {
 .entry-size {
   flex: 0 0 54px;
   font-size: 10px;
-  color: #777777;
+  color: var(--text-faint);
   text-align: right;
 }
 
@@ -353,8 +353,8 @@ function progressPct(): number {
   gap: 8px;
   padding: 4px 10px;
   font-size: 11px;
-  color: #4ec9b0;
-  border-top: 1px solid #2e2e2e;
+  color: var(--accent);
+  border-top: 1px solid var(--border-divider);
   flex-shrink: 0;
 }
 
@@ -372,7 +372,7 @@ function progressPct(): number {
 .sftp-hint {
   padding: 16px 10px;
   font-size: 12px;
-  color: #777777;
+  color: var(--text-faint);
   text-align: center;
 }
 
@@ -383,7 +383,7 @@ function progressPct(): number {
 .sftp-error {
   padding: 4px 10px;
   font-size: 11px;
-  color: #e06c75;
+  color: var(--danger);
   flex-shrink: 0;
 }
 
@@ -399,8 +399,8 @@ function progressPct(): number {
 
 .dlg {
   width: 300px;
-  background: #252525;
-  border: 1px solid #3c3c3c;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   padding: 14px 16px;
@@ -409,13 +409,13 @@ function progressPct(): number {
 .dlg-title {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   margin-bottom: 6px;
 }
 
 .dlg-msg {
   font-size: 11px;
-  color: #999999;
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 
@@ -423,16 +423,16 @@ function progressPct(): number {
   width: 100%;
   padding: 6px 10px;
   font-size: 12px;
-  color: #e0e0e0;
-  background: #1a1a1a;
-  border: 1px solid #444444;
+  color: var(--text-body);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   outline: none;
   box-sizing: border-box;
 }
 
 .dlg-input:focus {
-  border-color: #4ec9b0;
+  border-color: var(--accent);
 }
 
 .dlg-footer {

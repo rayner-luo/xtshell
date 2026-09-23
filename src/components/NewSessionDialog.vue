@@ -36,6 +36,7 @@ const stopBits = ref(1);
 const parity = ref("None");
 const sessionName = ref("");
 const sessionEncoding = ref<Encoding>("utf-8");
+const createFolderId = ref<string | null>(null);
 const rememberPassword = ref(false);
 const error = ref("");
 const submitting = ref(false);
@@ -114,6 +115,8 @@ watch(
         sessionName.value = "";
         sessionEncoding.value = "utf-8";
         rememberPassword.value = false;
+        createFolderId.value = profilesStore.pendingNewFolderId;
+        profilesStore.pendingNewFolderId = null;
       }
       serialPorts.value = [];
       void profilesStore.refresh();
@@ -206,6 +209,7 @@ async function submit() {
       close();
       void saveProfile({
         name: sessionName.value.trim() || targetLabel.value,
+        folder: createFolderId.value ?? undefined,
         protocol: config.protocol,
         auth_mode: config.protocol === "ssh" ? (config.private_key ? "key" : "password") : undefined,
         host: config.host,
@@ -462,8 +466,8 @@ onBeforeUnmount(() => {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: #252525;
-  border: 1px solid #3c3c3c;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
@@ -473,20 +477,20 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dialog-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .dialog-close {
   width: 22px;
   height: 22px;
   font-size: 12px;
-  color: #999999;
+  color: var(--text-muted);
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -494,8 +498,8 @@ onBeforeUnmount(() => {
 }
 
 .dialog-close:hover {
-  color: #ffffff;
-  background: #3c3c3c;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .dialog-body {
@@ -507,26 +511,26 @@ onBeforeUnmount(() => {
   flex: 1;
   padding: 6px 0;
   font-size: 12px;
-  color: #999999;
-  background: #2a2a2a;
+  color: var(--text-muted);
+  background: var(--border-divider);
   border: none;
   cursor: pointer;
 }
 
 .segment + .segment {
-  border-left: 1px solid #444444;
+  border-left: 1px solid var(--border-strong);
 }
 
 .segment.selected {
-  background: #333e4c;
-  color: #4ec9b0;
+  background: var(--bg-selected);
+  color: var(--accent);
   font-weight: 600;
 }
 
 .auth-toggle {
   display: flex;
   flex: 1;
-  border: 1px solid #444444;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -546,13 +550,13 @@ onBeforeUnmount(() => {
   width: 70px;
   flex-shrink: 0;
   font-size: 12px;
-  color: #cccccc;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .form-label.required::after {
   content: " *";
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .form-input {
@@ -561,9 +565,9 @@ onBeforeUnmount(() => {
   padding: 6px 10px;
   font-size: 12px;
   font-family: Consolas, monospace;
-  color: #e0e0e0;
-  background: #1a1a1a;
-  border: 1px solid #444444;
+  color: var(--text-body);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   outline: none;
   box-sizing: border-box;
@@ -574,7 +578,7 @@ onBeforeUnmount(() => {
 }
 
 .form-input:focus {
-  border-color: #4ec9b0;
+  border-color: var(--accent);
 }
 
 .btn.refresh {
@@ -589,9 +593,9 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   padding: 8px 10px;
   font-size: 12px;
-  color: #ff8a8a;
-  background: #3a1f1f;
-  border: 1px solid #5a2a2a;
+  color: var(--danger-bright);
+  background: var(--bg-danger-tint);
+  border: 1px solid var(--border-danger-tint);
   border-radius: 4px;
 }
 
@@ -602,10 +606,10 @@ onBeforeUnmount(() => {
 
 .section-divider {
   font-size: 11px;
-  color: #777777;
+  color: var(--text-faint);
   margin: 8px 0 10px;
   padding-bottom: 6px;
-  border-bottom: 1px dashed #3c3c3c;
+  border-bottom: 1px dashed var(--border-strong);
 }
 
 .remember-check {
@@ -613,12 +617,12 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #aaaaaa;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .remember-check input {
-  accent-color: #4ec9b0;
+  accent-color: var(--accent);
 }
 
 .dialog-footer {
@@ -626,32 +630,32 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid #333333;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .btn {
   padding: 6px 18px;
   font-size: 12px;
-  color: #cccccc;
-  background: #333333;
-  border: 1px solid #444444;
+  color: var(--text-secondary);
+  background: var(--border-subtle);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .btn:hover:not(:disabled) {
-  background: #3c3c3c;
+  background: var(--bg-hover);
 }
 
 .btn.primary {
-  color: #1e1e1e;
-  background: #4ec9b0;
-  border-color: #4ec9b0;
+  color: var(--bg-app);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: #5fdcc0;
+  background: var(--accent-hover);
 }
 
 .btn:disabled {

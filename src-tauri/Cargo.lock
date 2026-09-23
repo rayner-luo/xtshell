@@ -7031,6 +7031,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "gtk",
  "rand 0.8.8",
  "rmcp",
  "russh",

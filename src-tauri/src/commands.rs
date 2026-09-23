@@ -2,6 +2,9 @@ use tauri::{AppHandle, Emitter, State};
 
 use serde::Serialize;
 
+#[cfg(target_os = "linux")]
+use gtk::prelude::ObjectExt;
+
 use crate::error::ApiError;
 use crate::profile::{ProfilesTree, SaveProfileRequest, SharedProfiles};
 use crate::session::manager::{SessionConfig, SessionId, SessionInfo, SharedManager};
@@ -10,6 +13,23 @@ use crate::session::manager::{SessionConfig, SessionId, SessionInfo, SharedManag
 pub struct SerialPortInfoDto {
     pub path: String,
     pub kind: String,
+}
+
+/// 主题切换同步到原生层：Linux 上 select 下拉/右键菜单等由 GTK 原生渲染，
+/// 运行时切换 GtkSettings 主题使其跟随应用主题；其他平台由网页层 color-scheme 自管。
+/// 注意：不能用 gtk-application-prefer-dark-theme——webview 存在后 false→true
+/// 切换会导致 WebKitGTK 的下拉弹出窗口无法创建（实测），改设完整主题名则无此问题。
+#[tauri::command]
+pub fn set_native_theme(dark: bool) {
+    #[cfg(target_os = "linux")]
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_property(
+            "gtk-theme-name",
+            if dark { "Adwaita-dark" } else { "Adwaita" },
+        );
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = dark;
 }
 
 #[tauri::command]

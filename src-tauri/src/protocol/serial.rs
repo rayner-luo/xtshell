@@ -11,6 +11,7 @@ use std::sync::Mutex;
 
 enum SerialWriter {
     Tokio(tokio::io::WriteHalf<tokio_serial::SerialStream>),
+    #[cfg_attr(not(windows), allow(dead_code))]
     Std(Arc<Mutex<std::fs::File>>),
 }
 
@@ -30,8 +31,11 @@ impl SerialConn {
         on_output: OutputSink,
         on_closed: ClosedSignal,
     ) -> AppResult<Self> {
+        #[cfg_attr(not(windows), allow(unused_variables))]
         let raw_data_bits = data_bits;
+        #[cfg_attr(not(windows), allow(unused_variables))]
         let raw_stop_bits = stop_bits;
+        #[cfg_attr(not(windows), allow(unused_variables))]
         let raw_parity = parity;
 
         let data_bits = match data_bits {
@@ -95,7 +99,8 @@ impl SerialConn {
                 })
             }
             Err(primary_err) => {
-                match win_fallback::open_blocking(
+                #[cfg(windows)]
+                let result = match win_fallback::open_blocking(
                     path,
                     baud,
                     raw_data_bits,
@@ -119,7 +124,11 @@ impl SerialConn {
                         })
                     }
                     Err(_) => Err(AppError::Connection(format!("{path}: {primary_err}"))),
-                }
+                };
+                #[cfg(not(windows))]
+                let result: AppResult<SerialConn> =
+                    Err(AppError::Connection(format!("{path}: {primary_err}")));
+                result
             }
         }
     }

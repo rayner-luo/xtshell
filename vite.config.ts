@@ -16,7 +16,9 @@ export default defineConfig(() => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // 绑定 IPv4 回环而非默认的 ::1：tauri devUrl 指向 127.0.0.1，
+    // 且环境代理的 no_proxy 通常不含 localhost（见 tauri.conf.json devUrl）
+    host: host || "127.0.0.1",
     hmr: host
       ? {
           protocol: "ws",

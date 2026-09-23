@@ -19,11 +19,13 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSessionStore } from "./stores/session";
 import { useProfilesStore } from "./stores/profiles";
+import { useSettingsStore } from "./stores/settings";
 import { useSessionLog } from "./composables/useSessionLog";
 import { onSessionsChanged, onProfilesChanged } from "./lib/api";
 
 const store = useSessionStore();
 const sftpStore = useSftpStore();
+const settingsStore = useSettingsStore();
 const sessionLog = useSessionLog();
 
 function onMenuSftp() {
@@ -47,6 +49,10 @@ let unlistenSessions: (() => void) | null = null;
 let unlistenProfiles: (() => void) | null = null;
 
 function newSession() {
+  showDialog.value = true;
+}
+
+function onNewSessionFromMenu() {
   showDialog.value = true;
 }
 
@@ -92,6 +98,7 @@ async function quitApp() {
 }
 
 onMounted(async () => {
+  window.addEventListener("xtshell:new-session", onNewSessionFromMenu);
   await store.refresh();
   unlistenSessions = await onSessionsChanged(() => {
     void store.refresh();
@@ -102,6 +109,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("xtshell:new-session", onNewSessionFromMenu);
   unlistenSessions?.();
   unlistenProfiles?.();
   profilesStore.unbind();
@@ -115,6 +123,8 @@ onBeforeUnmount(() => {
       @disconnect="disconnect"
       @font-settings="showSettings = true"
       @encoding-settings="showEncoding = true"
+      @theme-dark="settingsStore.setTheme('dark')"
+      @theme-light="settingsStore.setTheme('light')"
       @mcp-info="showMcp = true"
       @sftp="onMenuSftp"
       @copy="menuCopy"
@@ -151,6 +161,83 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
+/* 主题变量：默认浅色（灰色调），深色为可选主题（原配色）。
+   store 启动时总会显式设置 data-theme；无属性时按浅色回退。
+   组件样式一律引用变量，勿再写死 hex。 */
+:root {
+  color-scheme: light;
+  --bg-app: #f2f2f3;
+  --bg-panel: #f9f9fa;
+  --bg-input: #ffffff;
+  --bg-raised: #e9e9eb;
+  --bg-hover: #dcdcdf;
+  --bg-hover-soft: #e0e0e2;
+  --bg-tabbar: #e4e4e6;
+  --bg-sidebar: #ebebed;
+  --bg-selected: #d3e2ec;
+  --bg-danger-tint: #f6e4e4;
+  --border-danger-tint: #e5b8b8;
+  --border-subtle: #d5d5d8;
+  --border-strong: #bcbcbf;
+  --border-divider: #dedee0;
+  --border-hover: #c4c4c8;
+  --text-primary: #1d1d1f;
+  --text-secondary: #3a3a3c;
+  --text-body: #2c2c2e;
+  --text-muted: #6e6e73;
+  --text-faint: #98989d;
+  --text-disabled: #b0b0b5;
+  --text-on-accent: #ffffff;
+  --accent: #0e9488;
+  --accent-hover: #12a89a;
+  --accent-border: #86c7bf;
+  --icon-accent: #0e86a8;
+  --accent-blue: #1a7ca8;
+  --accent-blue-bright: #0f6286;
+  --accent-blue-border: #a3cede;
+  --danger: #d93b3b;
+  --danger-bright: #e35d5d;
+  --danger-border: #eec3c3;
+  --warning: #a87b16;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-app: #1e1e1e;
+  --bg-panel: #252525;
+  --bg-input: #1a1a1a;
+  --bg-raised: #2d2d2d;
+  --bg-hover: #3c3c3c;
+  --bg-hover-soft: #282828;
+  --bg-tabbar: #181818;
+  --bg-sidebar: #232323;
+  --bg-selected: #2c3a46;
+  --bg-danger-tint: #3a1f1f;
+  --border-danger-tint: #5a2a2a;
+  --border-subtle: #333333;
+  --border-strong: #444444;
+  --border-divider: #2a2a2a;
+  --border-hover: #555555;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-body: #e0e0e0;
+  --text-muted: #999999;
+  --text-faint: #777777;
+  --text-disabled: #666666;
+  --text-on-accent: #ffffff;
+  --accent: #4ec9b0;
+  --accent-hover: #5fd8be;
+  --accent-border: #2a5a50;
+  --icon-accent: #64dafe;
+  --accent-blue: #9cdcfe;
+  --accent-blue-bright: #c8e6ff;
+  --accent-blue-border: #2a5a78;
+  --danger: #ff6b6b;
+  --danger-bright: #ff8a8a;
+  --danger-border: #6a3030;
+  --warning: #e5c07b;
+}
+
 html,
 body,
 #app {
@@ -158,7 +245,7 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #1e1e1e;
+  background: var(--bg-app);
 }
 
 * {

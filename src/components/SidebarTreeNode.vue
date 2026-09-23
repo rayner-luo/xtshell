@@ -67,8 +67,9 @@ function cancelEdit() {
 
 function folderMenu(e: MouseEvent) {
   openCtxMenu(e, [
+    { label: "新建连接", action: () => profilesStore.openNew(props.folder!.id) },
     {
-      label: "新建子目录",
+      label: "新建目录",
       action: () => profilesStore.newFolder("新建目录", props.folder!.id),
     },
     { label: "重命名", action: startEdit },
@@ -194,19 +195,19 @@ function onDrop(e: DragEvent) {
   gap: 6px;
   height: 26px;
   font-size: 12px;
-  color: #bbbbbb;
+  color: var(--text-secondary);
   cursor: default;
   white-space: nowrap;
   user-select: none;
 }
 
 .node:hover {
-  background: #2a2a2a;
+  background: var(--border-divider);
 }
 
 .node.dropTarget {
-  background: #2c3a46;
-  outline: 1px dashed #4ec9b0;
+  background: var(--bg-selected);
+  outline: 1px dashed var(--accent);
 }
 
 .caret {
@@ -214,14 +215,14 @@ function onDrop(e: DragEvent) {
   height: 26px;
   line-height: 26px;
   text-align: center;
-  color: #888888;
+  color: var(--text-muted);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .icon {
   font-size: 12px;
-  color: #64dafe;
+  color: var(--icon-accent);
 }
 
 .name {
@@ -231,7 +232,7 @@ function onDrop(e: DragEvent) {
 
 .count {
   font-size: 10px;
-  color: #666666;
+  color: var(--text-disabled);
 }
 
 .proto-badge {
@@ -244,24 +245,24 @@ function onDrop(e: DragEvent) {
 }
 
 .proto-badge.ssh {
-  color: #4ec9b0;
+  color: var(--accent);
 }
 
 .proto-badge.telnet {
-  color: #e5c07b;
+  color: var(--warning);
 }
 
 .proto-badge.serial {
-  color: #56b6c2;
+  color: var(--accent-blue);
 }
 
 .edit-input {
   width: 120px;
   padding: 2px 6px;
   font-size: 12px;
-  color: #e0e0e0;
-  background: #1a1a1a;
-  border: 1px solid #4ec9b0;
+  color: var(--text-body);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
   border-radius: 3px;
   outline: none;
 }

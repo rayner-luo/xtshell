@@ -83,21 +83,21 @@ async function chooseCancel() {
 
 .dialog {
   width: 340px;
-  background: #252525;
-  border: 1px solid #3c3c3c;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
 .dialog-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dialog-title {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .dialog-body {
@@ -106,7 +106,7 @@ async function chooseCancel() {
 
 .hint-text {
   font-size: 12px;
-  color: #aaaaaa;
+  color: var(--text-muted);
 }
 
 .dialog-footer {
@@ -114,33 +114,33 @@ async function chooseCancel() {
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid #333333;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .btn {
   padding: 6px 14px;
   font-size: 12px;
-  color: #cccccc;
+  color: var(--text-secondary);
   background: transparent;
-  border: 1px solid #555555;
+  border: 1px solid var(--border-hover);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .btn:hover {
-  background: #3c3c3c;
-  color: #ffffff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .btn.primary {
-  color: #1e1e1e;
-  background: #4ec9b0;
-  border-color: #4ec9b0;
+  color: var(--bg-app);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
 .btn.primary:hover {
-  background: #5fd8be;
-  color: #1e1e1e;
+  background: var(--accent-hover);
+  color: var(--bg-app);
 }
 </style>

@@ -16,6 +16,10 @@ export const resizeSession = (id: string, cols: number, rows: number) =>
 export const getSessionOutput = (id: string, offset: number) =>
   invoke<[number[], number]>("get_session_output", { id, offset });
 
+/** Linux 上同步 GTK 原生主题（select 下拉、右键菜单等原生弹出跟随应用主题） */
+export const setNativeTheme = (dark: boolean) =>
+  invoke<void>("set_native_theme", { dark });
+
 export function onSessionOutput(
   id: string,
   cb: (data: Uint8Array) => void,

@@ -41,6 +41,11 @@ base64 = "0.22"
 rand = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 
+# Linux 主题切换：运行时改 GtkSettings 使原生弹出（select 下拉/右键菜单）跟随应用主题。
+# 注意：target 表必须放在普通 [dependencies] 之后（TOML 表头会终结上一个表）。
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

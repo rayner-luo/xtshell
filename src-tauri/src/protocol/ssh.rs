@@ -22,13 +22,11 @@ impl client::Handler for ClientHandler {
 
 /// 将 russh 连接错误映射为友好提示：底层 IO 超时（WSA 10060 / Linux 110）统一为
 /// AppError::ConnectTimeout（"连接超时，请重试"），其余保留原文。
-fn connect_err(e: russh::Error) -> AppError {
-    if let russh::Error::IO(ref io) = e {
-        if matches!(io.raw_os_error(), Some(10060) | Some(110)) {
-            return AppError::ConnectTimeout;
-        }
+fn connect_err(e: russh::Error, host: &str) -> AppError {
+    match e {
+        russh::Error::IO(io) => AppError::map_connect_io(io, host),
+        other => AppError::Connection(other.to_string()),
     }
-    AppError::Connection(e.to_string())
 }
 
 /// SSH client 句柄共享槽位：终端流与 SFTP 通道共用（close 时取走并断开）
@@ -75,7 +73,7 @@ impl SshStream {
             ..Default::default()
         });
         let mut handle = client::connect(config, (host, port), ClientHandler).await
-            .map_err(connect_err)?;
+            .map_err(|e| connect_err(e, host))?;
 
         Self::authenticate(&mut handle, username, password, private_key, private_key_passphrase).await?;
 

@@ -39,7 +39,7 @@ export const McpIcon = (): VNode =>
     "aria-hidden": "true",
   }, [
     h("path", { d: "M0 0h24v24H0z", fill: "none" }),
-    h("g", { fill: "none", stroke: "#64dafe", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.5" }, [
+    h("g", { fill: "none", stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.5" }, [
       h("path", { d: "m3.5 11.75l8.172-8.171a2.828 2.828 0 1 1 4 4m0 0L9.5 13.75m6.172-6.171a2.828 2.828 0 0 1 4 4l-6.965 6.964a1 1 0 0 0 0 1.414L14 21.25" }),
       h("path", { d: "m17.5 9.75l-6.172 6.171a2.829 2.829 0 0 1-4-4L13.5 5.749" }),
     ]),
@@ -56,7 +56,7 @@ export const FontIcon = (): VNode =>
     h("path", { d: "M0 0h24v24H0z", fill: "none" }),
     h("path", {
       fill: "none",
-      stroke: "#64dafe",
+      stroke: "currentColor",
       "stroke-linecap": "round",
       "stroke-linejoin": "round",
       "stroke-width": "1.5",
@@ -107,7 +107,7 @@ export const AboutIcon = (): VNode =>
     "aria-hidden": "true",
   }, [
     h("path", { d: "M0 0h24v24H0z", fill: "none" }),
-    h("g", { fill: "none", stroke: "#64dafe", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.5" }, [
+    h("g", { fill: "none", stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.5" }, [
       h("circle", { cx: "12", cy: "12", r: "10" }),
       h("path", { d: "M12 16v-4m-.125-3.75H12m-.25 0a.25.25 0 1 1 .5 0a.25.25 0 0 1-.5 0" }),
     ]),
@@ -123,7 +123,7 @@ export const ExitIcon = (): VNode =>
   }, [
     h("path", { d: "M0 0h1024v1024H0z", fill: "none" }),
     h("path", {
-      fill: "#64dafe",
+      fill: "currentColor",
       d: "M195.2 195.2a64 64 0 0 1 90.5 0L512 421.5l226.3-226.3a64 64 0 0 1 90.5 90.5L602.5 512l226.3 226.3a64 64 0 0 1-90.5 90.5L512 602.5L285.7 828.8a64 64 0 0 1-90.5-90.5L421.5 512L195.2 285.7a64 64 0 0 1 0-90.5",
     }),
   ]);
@@ -158,7 +158,7 @@ export const AddIcon = (): VNode =>
     h("path", { d: "M0 0h24v24H0z", fill: "none" }),
     h("path", {
       fill: "none",
-      stroke: "#64dafe",
+      stroke: "currentColor",
       "stroke-linecap": "round",
       "stroke-linejoin": "round",
       "stroke-width": "1.5",
@@ -221,4 +221,25 @@ export const LogIcon = (): VNode =>
       "stroke-linejoin": "round",
       "stroke-width": "1.5",
     }),
+  ]);
+
+export const ThemeIcon = (): VNode =>
+  h("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "1em",
+    height: "1em",
+    viewBox: "0 0 24 24",
+    "aria-hidden": "true",
+  }, [
+    h("path", { d: "M0 0h24v24H0z", fill: "none" }),
+    h("circle", {
+      cx: "12",
+      cy: "12",
+      r: "9",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "1.5",
+    }),
+    // 右半填充：明暗对比的主题图标
+    h("path", { d: "M12 3a9 9 0 0 1 0 18Z", fill: "currentColor" }),
   ]);

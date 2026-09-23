@@ -40,8 +40,8 @@ function onWindowMousedown() {
   position: fixed;
   min-width: 130px;
   padding: 4px 0;
-  background: #2a2a2a;
-  border: 1px solid #444444;
+  background: var(--border-divider);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
   z-index: 2000;
@@ -53,23 +53,23 @@ function onWindowMousedown() {
   padding: 6px 16px;
   font-size: 12px;
   text-align: left;
-  color: #cccccc;
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   cursor: pointer;
 }
 
 .ctx-item:hover {
-  background: #3c3c3c;
-  color: #ffffff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .ctx-item.danger {
-  color: #ff8a8a;
+  color: var(--danger-bright);
 }
 
 .ctx-item.danger:hover {
-  background: #4a2626;
-  color: #ffaaaa;
+  background: var(--bg-danger-tint);
+  color: var(--danger-bright);
 }
 </style>
