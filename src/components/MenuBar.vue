@@ -3,7 +3,7 @@ import { computed, ref, type VNode } from "vue";
 import { useSessionStore } from "../stores/session";
 import { useSettingsStore } from "../stores/settings";
 import { useSessionLog } from "../composables/useSessionLog";
-import { AboutIcon, AddIcon, ConnectIcon, CopyIcon, DisconnectIcon, EncodingIcon, ExitIcon, FontIcon, LogIcon, McpIcon, PasteIcon, SftpIcon, ThemeIcon } from "./icons";
+import { AboutIcon, AddIcon, ConnectIcon, CopyIcon, DisconnectIcon, EncodingIcon, ExitIcon, FontIcon, LogIcon, McpIcon, PaletteIcon, PasteIcon, SftpIcon, ThemeIcon } from "./icons";
 
 type MenuEvent =
   | "new-session"
@@ -11,6 +11,7 @@ type MenuEvent =
   | "font-settings"
   | "default-settings"
   | "encoding-settings"
+  | "appearance-settings"
   | "theme-dark"
   | "theme-light"
   | "mcp-info"
@@ -73,13 +74,14 @@ const menus = computed<Menu[]>(() => [
       { label: "断开", event: "disconnect", iconComponent: DisconnectIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
       { label: "重连", event: "reconnect", iconComponent: ConnectIcon, activeColor: "var(--icon-accent)", disabled: !canReconnect.value },
       { label: "日志", event: "toggle-log", iconComponent: LogIcon, activeColor: sessionLog.isRecording.value ? "var(--danger)" : "var(--icon-accent)", disabled: !hasActive.value },
+      { label: "字体", event: "font-settings", iconComponent: FontIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
+      { label: "编码", event: "encoding-settings", iconComponent: EncodingIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
+      { label: "配色", event: "appearance-settings", iconComponent: PaletteIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
     ],
   },
   {
     name: "设置",
     items: [
-      { label: "字体", event: "font-settings", iconComponent: FontIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
-      { label: "编码", event: "encoding-settings", iconComponent: EncodingIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
       {
         label: "主题",
         iconComponent: ThemeIcon,

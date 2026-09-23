@@ -41,7 +41,7 @@ function load(): SavedSettings {
         colorScheme: parsed.colorScheme === "light" || parsed.colorScheme === "dark"
           || parsed.colorScheme === "solarized-dark" || parsed.colorScheme === "solarized-light"
           ? parsed.colorScheme
-          : parsed.theme === "dark" ? "dark" : "light",
+          : "dark",
       };
     }
   } catch {
@@ -52,7 +52,7 @@ function load(): SavedSettings {
     fontSize: 13,
     theme: "light",
     encoding: "utf-8",
-    colorScheme: "light",
+    colorScheme: "dark",
   } satisfies SavedSettings;
 }
 

@@ -4,6 +4,7 @@ import MenuBar from "./components/MenuBar.vue";
 import Toolbar from "./components/Toolbar.vue";
 import SessionSidebar from "./components/SessionSidebar.vue";
 import SessionSettingsDialog from "./components/SessionSettingsDialog.vue";
+import AppearanceDialog from "./components/AppearanceDialog.vue";
 import TerminalPane from "./components/TerminalPane.vue";
 import NewSessionDialog from "./components/NewSessionDialog.vue";
 import ContextMenu from "./components/ContextMenu.vue";
@@ -38,6 +39,7 @@ const showDialog = ref(false);
 const showEncoding = ref(false);
 const showSettings = ref(false);
 const showSessionSettings = ref(false);
+const showAppearance = ref(false);
 const showMcp = ref(false);
 const showAbout = ref(false);
 const dialogOpen = computed({
@@ -126,6 +128,7 @@ onBeforeUnmount(() => {
       @font-settings="showSettings = true"
       @default-settings="showSessionSettings = true"
       @encoding-settings="showEncoding = true"
+      @appearance-settings="showAppearance = true"
       @theme-dark="settingsStore.setTheme('dark')"
       @theme-light="settingsStore.setTheme('light')"
       @mcp-info="showMcp = true"
@@ -154,6 +157,7 @@ onBeforeUnmount(() => {
     <NewSessionDialog v-model:open="dialogOpen" :edit-profile="profilesStore.editingProfile" />
     <SettingsDialog v-model:open="showSettings" />
     <SessionSettingsDialog v-model:open="showSessionSettings" />
+    <AppearanceDialog v-model:open="showAppearance" />
     <EncodingDialog v-model:open="showEncoding" />
     <McpDialog v-model:open="showMcp" />
     <AboutDialog v-model:open="showAbout" />

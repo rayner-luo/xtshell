@@ -243,3 +243,21 @@ export const ThemeIcon = (): VNode =>
     // 右半填充：明暗对比的主题图标
     h("path", { d: "M12 3a9 9 0 0 1 0 18Z", fill: "currentColor" }),
   ]);
+
+export const PaletteIcon = (): VNode =>
+  h("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "1em",
+    height: "1em",
+    viewBox: "0 0 24 24",
+    "aria-hidden": "true",
+  }, [
+    h("path", { d: "M0 0h24v24H0z", fill: "none" }),
+    h("g", { fill: "none", stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.5" }, [
+      h("circle", { cx: "12", cy: "12", r: "9" }),
+      h("path", { d: "M9 7h6" }),
+      h("circle", { cx: "9", cy: "12", r: "1.2" }),
+      h("circle", { cx: "12.5", cy: "16", r: "1.2" }),
+      h("circle", { cx: "15.5", cy: "12", r: "1.2" }),
+    ]),
+  ]);
