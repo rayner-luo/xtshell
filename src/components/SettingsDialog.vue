@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useSettingsStore, fontOptions } from "../stores/settings";
+import { useSessionStore } from "../stores/session";
+import { useProfilesStore } from "../stores/profiles";
+import type { TerminalAppearance } from "../types/profile";
 
 const props = defineProps<{
   open: boolean;
@@ -11,7 +14,45 @@ const emit = defineEmits<{
 }>();
 
 const settings = useSettingsStore();
+const sessionStore = useSessionStore();
+const profilesStore = useProfilesStore();
 const previewText = ref("rayner@debian:~$ hostname && uname -a");
+const fontFamily = ref(settings.fontFamily);
+const fontSize = ref(settings.fontSize);
+
+const activeProfileId = computed(() => {
+  const sessionId = sessionStore.activeId;
+  if (!sessionId) return null;
+  return profilesStore.launchedFrom[sessionId] ?? null;
+});
+
+const activeProfile = computed(() =>
+  activeProfileId.value
+    ? profilesStore.profiles.find((p) => p.id === activeProfileId.value) ?? null
+    : null,
+);
+
+const currentAppearance = computed<TerminalAppearance | null>(() => activeProfile.value?.terminal_appearance ?? null);
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen) return;
+    fontFamily.value = currentAppearance.value?.font_family ?? settings.fontFamily;
+    fontSize.value = currentAppearance.value?.font_size ?? settings.fontSize;
+  },
+);
+
+async function save() {
+  const profileId = activeProfileId.value;
+  if (!profileId) return;
+  await profilesStore.setAppearance(profileId, {
+    ...currentAppearance.value,
+    font_family: fontFamily.value,
+    font_size: fontSize.value,
+  });
+  close();
+}
 
 function close() {
   emit("update:open", false);
@@ -23,13 +64,13 @@ function close() {
     <div v-if="open" class="overlay" @click.self="close">
       <div class="dialog">
         <div class="dialog-header">
-          <span class="dialog-title">字体设置</span>
+          <span class="dialog-title">会话字体设置</span>
           <button class="dialog-close" @click="close">✕</button>
         </div>
         <div class="dialog-body">
           <div class="form-row">
             <label class="form-label">字体族</label>
-            <select v-model="settings.fontFamily" class="form-input">
+            <select v-model="fontFamily" class="form-input">
               <option v-for="f in fontOptions" :key="f.value" :value="f.value">
                 {{ f.label }}
               </option>
@@ -38,20 +79,20 @@ function close() {
           <div class="form-row">
             <label class="form-label">字号</label>
             <input
-              v-model.number="settings.fontSize"
+              v-model.number="fontSize"
               class="form-input narrow"
               type="number"
               :min="8"
               :max="32"
             />
           </div>
-          <div class="preview-box" :style="{ fontFamily: settings.fontFamily, fontSize: settings.fontSize + 'px' }">
+          <div class="preview-box" :style="{ fontFamily, fontSize: fontSize + 'px' }">
             {{ previewText }}
           </div>
-          <div class="hint-text">设置对所有终端（含已打开的）即时生效</div>
+          <div class="hint-text">只对当前会话生效。</div>
         </div>
         <div class="dialog-footer">
-          <button class="btn primary" @click="close">完成</button>
+          <button class="btn primary" :disabled="!activeProfileId" @click="save">保存</button>
         </div>
       </div>
     </div>

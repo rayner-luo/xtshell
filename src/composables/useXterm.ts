@@ -1,4 +1,4 @@
-import { onMounted, onBeforeUnmount, watch, type Ref } from "vue";
+import { onMounted, onBeforeUnmount, watch, computed, type Ref, type ComputedRef } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -23,16 +23,17 @@ import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { registerTerminalActions, unregisterTerminalActions } from "../lib/terminalBus";
 import { useSessionStore, type Encoding } from "../stores/session";
-import { useSettingsStore, type ThemeName } from "../stores/settings";
+import { useSettingsStore, type TerminalColorScheme } from "../stores/settings";
+import { useProfilesStore } from "../stores/profiles";
 import { useZmodemStore } from "../stores/zmodem";
 
 export interface XtermHandles {
   term: Terminal;
   fit: () => void;
+  backgroundColor: ComputedRef<string>;
 }
 
-// 终端配色独立于窗口 UI：深浅两套，随应用主题切换
-const TERMINAL_THEMES: Record<ThemeName, import("@xterm/xterm").ITheme> = {
+const TERMINAL_THEMES: Record<TerminalColorScheme, import("@xterm/xterm").ITheme> = {
   dark: {
     background: "#1e1e1e",
     foreground: "#d4d4d4",
@@ -44,7 +45,31 @@ const TERMINAL_THEMES: Record<ThemeName, import("@xterm/xterm").ITheme> = {
     cursorAccent: "#f2f2f3",
     selectionBackground: "#c9c9ce",
   },
+  "solarized-dark": {
+    background: "#002b36",
+    foreground: "#839496",
+    cursor: "#839496",
+    cursorAccent: "#002b36",
+    selectionBackground: "#073642",
+  },
+  "solarized-light": {
+    background: "#fdf6e3",
+    foreground: "#657b83",
+    cursor: "#657b83",
+    cursorAccent: "#fdf6e3",
+    selectionBackground: "#eee8d5",
+  },
 };
+
+function terminalColorScheme(value: string | null | undefined, fallback: TerminalColorScheme): TerminalColorScheme {
+  if (
+    value === "light" ||
+    value === "dark" ||
+    value === "solarized-dark" ||
+    value === "solarized-light"
+  ) return value;
+  return fallback;
+}
 
 export function useXterm(
   sessionId: string,
@@ -54,12 +79,22 @@ export function useXterm(
 ): XtermHandles {
   const sessionStore = useSessionStore();
   const settings = useSettingsStore();
+  const profilesStore = useProfilesStore();
+
+  const appearance = computed(() => profilesStore.appearanceForSession(sessionId));
+
+  const terminalTheme = computed<TerminalColorScheme>(() =>
+    terminalColorScheme(appearance.value?.color_scheme, settings.colorScheme),
+  );
+  const backgroundColor = computed(
+    () => TERMINAL_THEMES[terminalTheme.value].background ?? "#1e1e1e",
+  );
 
   const term = new Terminal({
     cursorBlink: true,
-    fontSize: settings.fontSize,
-    fontFamily: settings.fontFamily,
-    theme: TERMINAL_THEMES[settings.theme],
+    fontSize: appearance.value?.font_size ?? settings.fontSize,
+    fontFamily: appearance.value?.font_family ?? settings.fontFamily,
+    theme: TERMINAL_THEMES[terminalTheme.value ?? settings.theme],
   });
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
@@ -301,12 +336,12 @@ export function useXterm(
   );
 
   watch(
-    () => [settings.fontFamily, settings.fontSize, settings.theme] as const,
-    ([family, size, theme]) => {
+    () => [appearance.value, settings.fontFamily, settings.fontSize, settings.colorScheme] as const,
+    ([a, globalFamily, globalSize, globalColorScheme]) => {
       if (disposed) return;
-      term.options.fontFamily = family;
-      term.options.fontSize = size;
-      term.options.theme = TERMINAL_THEMES[theme];
+      term.options.fontFamily = a?.font_family ?? globalFamily;
+      term.options.fontSize = a?.font_size ?? globalSize;
+      term.options.theme = TERMINAL_THEMES[terminalColorScheme(a?.color_scheme, globalColorScheme)];
       fit();
     },
   );
@@ -333,5 +368,5 @@ export function useXterm(
     term.dispose();
   });
 
-  return { term, fit };
+  return { term, fit, backgroundColor };
 }

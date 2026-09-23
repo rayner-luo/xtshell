@@ -6,7 +6,7 @@ use serde::Serialize;
 use gtk::prelude::ObjectExt;
 
 use crate::error::ApiError;
-use crate::profile::{ProfilesTree, SaveProfileRequest, SharedProfiles};
+use crate::profile::{ProfilesTree, SaveProfileRequest, SharedProfiles, TerminalAppearance};
 use crate::session::manager::{SessionConfig, SessionId, SessionInfo, SharedManager};
 
 #[derive(Debug, Serialize)]
@@ -178,6 +178,22 @@ pub async fn save_profile(
     let id = profiles.lock().await.upsert_session(req).map_err(ApiError::from)?;
     changed(&app, "profiles-changed");
     Ok(id)
+}
+
+#[tauri::command]
+pub async fn update_profile_appearance(
+    app: AppHandle,
+    profiles: State<'_, SharedProfiles>,
+    id: String,
+    appearance: TerminalAppearance,
+) -> Result<(), ApiError> {
+    profiles
+        .lock()
+        .await
+        .set_terminal_appearance(&id, appearance)
+        .map_err(ApiError::from)?;
+    changed(&app, "profiles-changed");
+    Ok(())
 }
 
 #[tauri::command]

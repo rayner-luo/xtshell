@@ -12,7 +12,7 @@ const store = useSessionStore();
 
 const container = ref<HTMLElement | null>(null);
 
-const { fit } = useXterm(
+const { fit, backgroundColor } = useXterm(
   props.sessionId,
   container,
   () => {
@@ -37,14 +37,15 @@ defineExpose({ fit });
 </script>
 
 <template>
-  <div ref="container" class="terminal-tab"></div>
+  <div ref="container" class="terminal-tab" :style="{ backgroundColor }"></div>
 </template>
 
 <style scoped>
 .terminal-tab {
   width: 100%;
   height: 100%;
-  padding: 4px;
+  padding: 5px;
   box-sizing: border-box;
+  background-color: var(--bg-app);
 }
 </style>

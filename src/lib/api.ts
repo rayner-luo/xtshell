@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionConfig, SessionInfo } from "../types/session";
 import type { ProfilesTree, SaveProfileRequest, SerialPortInfo } from "../types/profile";
+import type { TerminalAppearance } from "../types/profile";
 
 export const createSession = (config: SessionConfig) =>
   invoke<string>("create_session", { config });
@@ -47,6 +48,8 @@ export function onSessionsChanged(cb: () => void): Promise<UnlistenFn> {
 export const listProfiles = () => invoke<ProfilesTree>("list_profiles");
 export const saveProfile = (req: SaveProfileRequest) =>
   invoke<string>("save_profile", { req });
+export const updateProfileAppearance = (id: string, appearance: TerminalAppearance) =>
+  invoke<void>("update_profile_appearance", { id, appearance });
 export const deleteProfile = (id: string) =>
   invoke<void>("delete_profile", { id });
 export const launchProfile = (

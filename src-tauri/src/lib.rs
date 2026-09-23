@@ -69,6 +69,7 @@ pub fn run() {
             commands::set_native_theme,
             commands::list_profiles,
             commands::save_profile,
+            commands::update_profile_appearance,
             commands::delete_profile,
             commands::launch_profile,
             commands::set_profile_secret,

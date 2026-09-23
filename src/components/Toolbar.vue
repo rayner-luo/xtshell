@@ -65,7 +65,7 @@ function pasteToTerminal() {
         <component :is="ConnectIcon" />
       </button>
       <span class="divider"></span>
-      <button class="icon-btn" title="字体设置" @click="emit('font-settings')">
+      <button class="icon-btn" title="会话字体设置" :disabled="!store.activeSession" @click="emit('font-settings')">
         <component :is="FontIcon" />
       </button>
       <button

@@ -1,10 +1,12 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
 import { setNativeTheme } from "../lib/api";
+import { Encoding } from "../types/session";
 
 const STORAGE_KEY = "xtshell.settings";
 
 export type ThemeName = "dark" | "light";
+export type TerminalColorScheme = "light" | "dark" | "solarized-dark" | "solarized-light";
 
 export const fontOptions = [
   { label: "Cascadia Mono", value: '"Cascadia Mono", Consolas, monospace' },
@@ -19,6 +21,8 @@ interface SavedSettings {
   fontFamily: string;
   fontSize: number;
   theme: ThemeName;
+  encoding: Encoding;
+  colorScheme: TerminalColorScheme;
 }
 
 function load(): SavedSettings {
@@ -33,12 +37,23 @@ function load(): SavedSettings {
             ? parsed.fontSize
             : 13,
         theme: parsed.theme === "dark" ? "dark" : "light",
+        encoding: typeof parsed.encoding === "string" ? parsed.encoding as Encoding : "utf-8",
+        colorScheme: parsed.colorScheme === "light" || parsed.colorScheme === "dark"
+          || parsed.colorScheme === "solarized-dark" || parsed.colorScheme === "solarized-light"
+          ? parsed.colorScheme
+          : parsed.theme === "dark" ? "dark" : "light",
       };
     }
   } catch {
     /* ignore */
   }
-  return { fontFamily: fontOptions[0].value, fontSize: 13, theme: "light" };
+  return {
+    fontFamily: fontOptions[0].value,
+    fontSize: 13,
+    theme: "light",
+    encoding: "utf-8",
+    colorScheme: "light",
+  } satisfies SavedSettings;
 }
 
 /** 把主题同步到 DOM（CSS 变量切换）与原生层（Linux 弹出菜单 GTK 主题） */
@@ -52,13 +67,21 @@ export const useSettingsStore = defineStore("settings", () => {
   const fontFamily = ref<string>(saved.fontFamily);
   const fontSize = ref<number>(saved.fontSize);
   const theme = ref<ThemeName>(saved.theme);
+  const encoding = ref<Encoding>(saved.encoding);
+  const colorScheme = ref<TerminalColorScheme>(saved.colorScheme);
 
   watch(
-    [fontFamily, fontSize, theme],
+    [fontFamily, fontSize, theme, encoding, colorScheme],
     () => {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ fontFamily: fontFamily.value, fontSize: fontSize.value, theme: theme.value }),
+        JSON.stringify({
+          fontFamily: fontFamily.value,
+          fontSize: fontSize.value,
+          theme: theme.value,
+          encoding: encoding.value,
+          colorScheme: colorScheme.value,
+        }),
       );
     },
     { deep: true },
@@ -73,5 +96,5 @@ export const useSettingsStore = defineStore("settings", () => {
     theme.value = t;
   }
 
-  return { fontFamily, fontSize, theme, setTheme };
+  return { fontFamily, fontSize, theme, encoding, colorScheme, setTheme };
 });

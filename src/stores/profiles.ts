@@ -10,7 +10,9 @@ import {
   moveProfile,
   moveFolder,
   saveProfile,
+  updateProfileAppearance,
 } from "../lib/api";
+import type { TerminalAppearance } from "../types/profile";
 import type { ProfileFolder, ProfileSessionView } from "../types/profile";
 import type { Encoding } from "../types/session";
 import { useSessionStore } from "./session";
@@ -52,6 +54,14 @@ export const useProfilesStore = defineStore("profiles", () => {
 
   function linkSession(sessionId: string, profileId: string) {
     launchedFrom.value = { ...launchedFrom.value, [sessionId]: profileId };
+  }
+
+  function appearanceForSession(sessionId: string): TerminalAppearance | null {
+    const profileId = launchedFrom.value[sessionId];
+    if (!profileId) return null;
+    return (
+      profiles.value.find((p) => p.id === profileId)?.terminal_appearance ?? null
+    );
   }
 
   function clearEdit() {
@@ -185,6 +195,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         data_bits: p.data_bits,
         stop_bits: p.stop_bits,
         parity: p.parity,
+        terminal_appearance: p.terminal_appearance,
         encoding: p.encoding,
       });
       await refresh();
@@ -212,6 +223,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         data_bits: p.data_bits,
         stop_bits: p.stop_bits,
         parity: p.parity,
+        terminal_appearance: p.terminal_appearance ?? undefined,
         encoding,
       });
       await refresh();
@@ -223,6 +235,15 @@ export const useProfilesStore = defineStore("profiles", () => {
   async function dropProfile(id: string, folder: string | null) {
     try {
       await moveProfile(id, folder);
+      await refresh();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  async function setAppearance(profileId: string, appearance: TerminalAppearance) {
+    try {
+      await updateProfileAppearance(profileId, appearance);
       await refresh();
     } catch (e) {
       fail(e);
@@ -251,6 +272,7 @@ export const useProfilesStore = defineStore("profiles", () => {
     openNew,
     clearEdit,
     linkSession,
+    appearanceForSession,
     refresh,
     bindEvents,
     unbind,
@@ -267,5 +289,6 @@ export const useProfilesStore = defineStore("profiles", () => {
     renameProfile,
     dropProfile,
     dropFolder,
+    setAppearance,
   };
 });

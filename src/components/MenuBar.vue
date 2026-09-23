@@ -9,6 +9,7 @@ type MenuEvent =
   | "new-session"
   | "disconnect"
   | "font-settings"
+  | "default-settings"
   | "encoding-settings"
   | "theme-dark"
   | "theme-light"
@@ -77,7 +78,7 @@ const menus = computed<Menu[]>(() => [
   {
     name: "设置",
     items: [
-      { label: "字体", event: "font-settings", iconComponent: FontIcon, activeColor: "var(--icon-accent)" },
+      { label: "字体", event: "font-settings", iconComponent: FontIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
       { label: "编码", event: "encoding-settings", iconComponent: EncodingIcon, activeColor: "var(--icon-accent)", disabled: !hasActive.value },
       {
         label: "主题",
@@ -87,6 +88,7 @@ const menus = computed<Menu[]>(() => [
           { label: "浅色", event: "theme-light", checked: settingsStore.theme === "light" },
         ],
       },
+      { label: "默认设置", event: "default-settings", iconComponent: FontIcon, activeColor: "var(--icon-accent)" },
     ],
   },
   {

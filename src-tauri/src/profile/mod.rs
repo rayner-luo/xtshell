@@ -20,6 +20,16 @@ pub struct ProfileFolder {
     pub parent: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default, rename_all = "snake_case")]
+pub struct TerminalAppearance {
+    pub font_family: Option<String>,
+    pub font_size: Option<u16>,
+    #[serde(default)]
+    pub encoding: Option<String>,
+    pub color_scheme: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileSession {
     pub id: String,
@@ -54,6 +64,8 @@ pub struct ProfileSession {
     pub parity: Option<String>,
     #[serde(default)]
     pub encoding: Option<String>,
+    #[serde(default)]
+    pub terminal_appearance: Option<TerminalAppearance>,
     pub created_at: String,
 }
 
@@ -83,6 +95,8 @@ pub struct ProfileSessionView {
     pub stop_bits: Option<u8>,
     pub parity: Option<String>,
     pub encoding: Option<String>,
+    #[serde(default)]
+    pub terminal_appearance: Option<TerminalAppearance>,
     pub created_at: String,
     pub has_password: bool,
     pub has_passphrase: bool,
@@ -129,6 +143,8 @@ pub struct SaveProfileRequest {
     pub parity: Option<String>,
     #[serde(default)]
     pub encoding: Option<String>,
+    #[serde(default)]
+    pub terminal_appearance: Option<TerminalAppearance>,
 }
 
 pub struct ProfileStore {
@@ -196,9 +212,10 @@ impl ProfileStore {
                     baud_rate: s.baud_rate,
                     data_bits: s.data_bits,
                     stop_bits: s.stop_bits,
-                    parity: s.parity.clone(),
-                    encoding: s.encoding.clone(),
-                    created_at: s.created_at.clone(),
+            parity: s.parity.clone(),
+            encoding: s.encoding.clone(),
+            terminal_appearance: s.terminal_appearance.clone(),
+            created_at: s.created_at.clone(),
                     has_password: s.password_enc.is_some(),
                     has_passphrase: s.private_key_passphrase_enc.is_some(),
                 })
@@ -381,6 +398,7 @@ impl ProfileStore {
             stop_bits: req.stop_bits,
             parity: req.parity,
             encoding: req.encoding,
+            terminal_appearance: req.terminal_appearance,
             created_at,
         };
 
@@ -412,6 +430,21 @@ impl ProfileStore {
             .ok_or_else(|| AppError::Connection(format!("profile not found: {id}")))?;
         s.folder = folder.map(|f| if f == "root" { String::new() } else { f })
             .filter(|f| !f.is_empty());
+        self.save()
+    }
+
+    pub fn set_terminal_appearance(
+        &mut self,
+        id: &str,
+        appearance: TerminalAppearance,
+    ) -> AppResult<()> {
+        let s = self
+            .file
+            .sessions
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or_else(|| AppError::SessionNotFound(id.to_string()))?;
+        s.terminal_appearance = Some(appearance);
         self.save()
     }
 

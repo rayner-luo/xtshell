@@ -2,6 +2,7 @@
 import { ref, watch, computed, onBeforeUnmount } from "vue";
 import { useSessionStore } from "../stores/session";
 import { useProfilesStore } from "../stores/profiles";
+import { useSettingsStore } from "../stores/settings";
 import { saveProfile, listSerialPorts } from "../lib/api";
 import type { Protocol, SessionConfig } from "../types/session";
 import type { ProfileSessionView, SerialPortInfo } from "../types/profile";
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 
 const store = useSessionStore();
 const profilesStore = useProfilesStore();
+const settingsStore = useSettingsStore();
 
 const protocol = ref<Protocol>("ssh");
 const host = ref("");
@@ -199,6 +201,12 @@ async function submit() {
         stop_bits: config.stop_bits,
         parity: config.parity,
         encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
+        terminal_appearance: props.editProfile.terminal_appearance ?? {
+          font_family: settingsStore.fontFamily,
+          font_size: settingsStore.fontSize,
+          encoding: sessionEncoding.value,
+          color_scheme: settingsStore.theme,
+        },
       });
     } else {
       // 先建会话并立即关闭对话框（tab 即时可见），profile 后台保存
@@ -225,6 +233,12 @@ async function submit() {
         stop_bits: config.stop_bits,
         parity: config.parity,
         encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
+        terminal_appearance: {
+          font_family: settingsStore.fontFamily,
+          font_size: settingsStore.fontSize,
+          encoding: sessionEncoding.value,
+          color_scheme: settingsStore.theme,
+        },
       })
         .then((profileId) => profilesStore.linkSession(sessionId, profileId))
         .catch(() => {

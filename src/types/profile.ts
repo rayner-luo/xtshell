@@ -22,9 +22,17 @@ export interface ProfileSessionView {
   stop_bits?: number;
   parity?: string;
   encoding?: string;
+  terminal_appearance?: TerminalAppearance | null;
   created_at: string;
   has_password: boolean;
   has_passphrase: boolean;
+}
+
+export interface TerminalAppearance {
+  font_family?: string | null;
+  font_size?: number | null;
+  encoding?: string | null;
+  color_scheme?: string | null;
 }
 
 export interface ProfilesTree {
@@ -50,6 +58,7 @@ export interface SaveProfileRequest {
   data_bits?: number;
   stop_bits?: number;
   encoding?: string;
+  terminal_appearance?: TerminalAppearance | null;
   parity?: string;
 }
 
