@@ -1,52 +1,34 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useZmodemStore } from "../stores/zmodem";
-import { zmodemStartReceive, zmodemSendFiles, zmodemCancel } from "../lib/api";
+import { zmodemCancel } from "../lib/api";
+import { getTerminalActions } from "../lib/terminalBus";
 
 const store = useZmodemStore();
 
 const open_ = computed(() => store.pendingId != null);
 
-async function chooseReceive() {
+/// 选定方向后交给 ZmodemPickDialog 取路径（用户手势驱动，此处不弹原生框）
+function chooseReceive() {
   const id = store.pendingId;
   store.resolve();
   if (!id) return;
-  try {
-    await new Promise((r) => setTimeout(r, 150));
-    const dir = await open({ directory: true });
-    if (dir) {
-      void zmodemStartReceive(id, dir as string).catch(() => {});
-    } else {
-      void zmodemCancel(id).catch(() => {});
-    }
-  } catch {
-    void zmodemCancel(id).catch(() => {});
-  }
+  store.askPick(id, "receive");
 }
 
-async function chooseSend() {
+function chooseSend() {
   const id = store.pendingId;
   store.resolve();
   if (!id) return;
-  try {
-    await new Promise((r) => setTimeout(r, 150));
-    const paths = await open({ multiple: true });
-    if (paths) {
-      const list = Array.isArray(paths) ? paths : [paths];
-      void zmodemSendFiles(id, list).catch(() => {});
-    } else {
-      void zmodemCancel(id).catch(() => {});
-    }
-  } catch {
-    void zmodemCancel(id).catch(() => {});
-  }
+  store.askPick(id, "send");
 }
 
-async function chooseCancel() {
+function chooseCancel() {
   const id = store.pendingId;
   store.resolve();
-  if (id) void zmodemCancel(id).catch(() => {});
+  if (!id) return;
+  void zmodemCancel(id).catch(() => {});
+  getTerminalActions(id)?.focus();
 }
 </script>
 

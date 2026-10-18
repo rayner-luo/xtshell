@@ -806,7 +806,19 @@ async fn open_for_send(path: &str) -> Result<(tokio::fs::File, String, u64), Str
     Ok((f, name, meta.len()))
 }
 
-/// 用户取消：用暂存字节驱动一次 abort，让远端干净退出
+/// 取走等待决策期间的暂存字节，**并把模式复位为透传**。
+///
+/// 复位是必须的：若停留在 `Pending`，后续远端输出会继续被 stash 吞掉，
+/// 终端表现为「输入任何内容都没反应、只有断开重连才恢复」。
+fn take_pending_stash(state: &mut ZmodemState) -> Option<Vec<u8>> {
+    match std::mem::replace(&mut state.mode, Mode::Passive { tail: Vec::new() }) {
+        Mode::Pending { stash } => Some(stash),
+        // 泵仍在跑时其 wire sender 已随替换丢弃，泵会自行退出
+        _ => None,
+    }
+}
+
+/// 用户取消：复位为透传，并用暂存字节驱动一次 abort，让远端干净退出
 pub async fn cancel_transfer(
     app: AppHandle,
     mgr: SharedManager,
@@ -816,12 +828,10 @@ pub async fn cancel_transfer(
     let entry = ZmodemState::entry(reg, id);
     let stash = {
         let mut guard = entry.lock().unwrap();
-        match &mut guard.mode {
-            Mode::Pending { stash } => std::mem::take(stash),
-            _ => return,
-        }
+        take_pending_stash(&mut guard)
     };
     emit_progress(&app, id, "cancelled", "", 0, 0);
+    let Some(stash) = stash else { return };
 
     // 主动发送 CAN 序列让远端 zmodem 退出
     if let Ok(mut receiver) = Receiver::new() {
@@ -861,6 +871,26 @@ pub async fn cancel_transfer(
 mod tests {
     use super::*;
     use tokio::io::AsyncReadExt;
+
+    #[test]
+    fn cancel_resets_pending_to_passthrough() {
+        // 取消（或任何结束路径）后必须回到透传模式：
+        // 否则远端提示符与命令回显会被 stash 吞掉，终端像卡死一样无任何输出。
+        let mut st = ZmodemState::new();
+        st.mode = Mode::Pending { stash: vec![1, 2, 3] };
+        assert_eq!(take_pending_stash(&mut st), Some(vec![1, 2, 3]));
+        let (out, detected) = st.feed(b"root@host:~# ");
+        assert_eq!(out, b"root@host:~# ");
+        assert!(!detected);
+    }
+
+    #[test]
+    fn cancel_without_pending_keeps_passthrough() {
+        let mut st = ZmodemState::new();
+        assert_eq!(take_pending_stash(&mut st), None);
+        let (out, _) = st.feed(b"echo ok\n");
+        assert_eq!(out, b"echo ok\n");
+    }
 
     #[test]
     fn feed_passthrough_normal_data() {

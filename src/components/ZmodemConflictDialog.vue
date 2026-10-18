@@ -2,24 +2,30 @@
 import { computed } from "vue";
 import { useZmodemStore } from "../stores/zmodem";
 import { zmodemResolveConflict } from "../lib/api";
+import { getTerminalActions } from "../lib/terminalBus";
 
 const store = useZmodemStore();
 
 const current = computed(() => store.conflicts[0] ?? null);
 
-async function chooseOverwrite() {
+/** 裁决一个冲突，并把键盘焦点交还终端（弹框抢走焦点同样会让输入看起来失灵） */
+function resolve(choice: string) {
   const c = store.shiftConflict();
-  if (c) void zmodemResolveConflict(c.temp, c.dest, "overwrite").catch(() => {});
+  if (!c) return;
+  void zmodemResolveConflict(c.temp, c.dest, choice).catch(() => {});
+  getTerminalActions(c.sessionId)?.focus();
 }
 
-async function chooseRename() {
-  const c = store.shiftConflict();
-  if (c) void zmodemResolveConflict(c.temp, c.dest, "rename").catch(() => {});
+function chooseOverwrite() {
+  resolve("overwrite");
 }
 
-async function chooseSkip() {
-  const c = store.shiftConflict();
-  if (c) void zmodemResolveConflict(c.temp, c.dest, "skip").catch(() => {});
+function chooseRename() {
+  resolve("rename");
+}
+
+function chooseSkip() {
+  resolve("skip");
 }
 </script>
 

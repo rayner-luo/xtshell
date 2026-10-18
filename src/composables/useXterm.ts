@@ -16,12 +16,8 @@ import {
   onZmodemAskFiles,
   onZmodemConflict,
   onZmodemProgress,
-  zmodemStartReceive,
-  zmodemSendFiles,
-  zmodemCancel,
 } from "../lib/api";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { open } from "@tauri-apps/plugin-dialog";
 import { registerTerminalActions, unregisterTerminalActions } from "../lib/terminalBus";
 import { useSessionStore, type Encoding } from "../stores/session";
 import { useSettingsStore, type TerminalColorScheme } from "../stores/settings";
@@ -179,7 +175,11 @@ export function useXterm(
         void writeText(text).catch(() => {});
       }
     }
-    registerTerminalActions(sessionId, { copy: copySelection, paste: pasteFromClipboard });
+    registerTerminalActions(sessionId, {
+      copy: copySelection,
+      paste: pasteFromClipboard,
+      focus: () => term.focus(),
+    });
 
     onSelectionChange = term.onSelectionChange(copySelection);
 
@@ -236,51 +236,15 @@ export function useXterm(
       if (disposed) return;
       zmodemStore.request(sessionId);
     });
-    // 远端 sz（下载）→ 目录选择框 → 一次性接收整批
-    let askDirBusy = false;
+    // 远端 sz（下载）→ 应用内弹框指定保存目录（点「保存到…」或直接粘贴路径）
     unlistenZmodemAskDir = await onZmodemAskDir(sessionId, () => {
-      if (disposed || askDirBusy) return;
-      askDirBusy = true;
-      void (async () => {
-        try {
-          // 延迟弹原生对话框：避开事件回调内同步弹窗导致的鼠标输入阻塞
-          await new Promise((r) => setTimeout(r, 150));
-          const dir = await open({ directory: true });
-          if (dir) {
-            await zmodemStartReceive(sessionId, dir as string);
-          } else {
-            await zmodemCancel(sessionId);
-            term.write("\r\x1b[33m[ZMODEM] 已取消接收\x1b[0m\r\n");
-          }
-        } catch {
-          void zmodemCancel(sessionId).catch(() => {});
-        } finally {
-          askDirBusy = false;
-        }
-      })();
+      if (disposed) return;
+      zmodemStore.askPick(sessionId, "receive");
     });
-    // 远端 rz（上传）→ 文件选择框（可多选）
-    let askFilesBusy = false;
+    // 远端 rz（上传）→ 应用内弹框选择要发送的文件
     unlistenZmodemAskFiles = await onZmodemAskFiles(sessionId, () => {
-      if (disposed || askFilesBusy) return;
-      askFilesBusy = true;
-      void (async () => {
-        try {
-          await new Promise((r) => setTimeout(r, 150));
-          const paths = await open({ multiple: true });
-          if (paths) {
-            const list = Array.isArray(paths) ? paths : [paths];
-            await zmodemSendFiles(sessionId, list);
-          } else {
-            await zmodemCancel(sessionId);
-            term.write("\r\x1b[33m[ZMODEM] 已取消发送，远端已中止\x1b[0m\r\n");
-          }
-        } catch {
-          void zmodemCancel(sessionId).catch(() => {});
-        } finally {
-          askFilesBusy = false;
-        }
-      })();
+      if (disposed) return;
+      zmodemStore.askPick(sessionId, "send");
     });
     // 同名冲突裁决 → 队列化弹自定义对话框
     unlistenZmodemConflict = await onZmodemConflict(sessionId, (info) => {

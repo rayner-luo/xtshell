@@ -13,6 +13,7 @@ import EncodingDialog from "./components/EncodingDialog.vue";
 import McpDialog from "./components/McpDialog.vue";
 import AboutDialog from "./components/AboutDialog.vue";
 import ZmodemDialog from "./components/ZmodemDialog.vue";
+import ZmodemPickDialog from "./components/ZmodemPickDialog.vue";
 import ZmodemConflictDialog from "./components/ZmodemConflictDialog.vue";
 import ConnectAuthDialog from "./components/ConnectAuthDialog.vue";
 import SshHostKeyDialog from "./components/SshHostKeyDialog.vue";
@@ -163,6 +164,7 @@ onBeforeUnmount(() => {
     <McpDialog v-model:open="showMcp" />
     <AboutDialog v-model:open="showAbout" />
     <ZmodemDialog />
+    <ZmodemPickDialog />
     <ZmodemConflictDialog />
     <ConnectAuthDialog />
     <SshHostKeyDialog />
