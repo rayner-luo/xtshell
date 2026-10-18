@@ -86,6 +86,8 @@ impl McpServer {
             data_bits: p.data_bits,
             stop_bits: p.stop_bits,
             parity: p.parity,
+            // MCP 手工建会话：不关联档案（无 UI 重输流程）
+            profile_id: None,
         };
         let id = self.mgr.lock().await.create(cfg.clone());
         let _ = self.app.emit("sessions-changed", ());

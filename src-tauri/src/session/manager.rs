@@ -26,6 +26,10 @@ pub struct SessionConfig {
     pub data_bits: Option<u8>,
     pub stop_bits: Option<u8>,
     pub parity: Option<String>,
+    /// 由已保存档案启动时记录其 id（见 `ProfileStore::build_session_config`）；
+    /// SSH 认证失败时前端据此弹出凭据重输框。手工新建的会话为 None。
+    #[serde(default)]
+    pub profile_id: Option<String>,
 }
 
 impl SessionConfig {

@@ -478,6 +478,7 @@ impl ProfileStore {
             data_bits: p.data_bits,
             stop_bits: p.stop_bits,
             parity: p.parity.clone(),
+            profile_id: Some(p.id.clone()),
         })
     }
 
@@ -643,5 +644,7 @@ mod tests {
         let cfg = s.build_session_config(&id).unwrap();
         assert_eq!(cfg.password.as_deref(), Some("pw"));
         assert_eq!(cfg.port, Some(2222));
+        // 认证失败后前端据此弹凭据重输框
+        assert_eq!(cfg.profile_id.as_deref(), Some(id.as_str()));
     }
 }

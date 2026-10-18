@@ -20,6 +20,13 @@ const mode = computed<"password" | "key" | "passphrase">(() => {
 });
 const open_ = computed(() => store.authPromptId != null && profile.value != null);
 
+/** 由「已保存凭据认证失败」触发的重输（区别于首次补录凭据） */
+const isRetry = computed(() => store.authRetrySessionId != null);
+const retryHint = computed(() => {
+  const what = mode.value === "password" ? "密码" : mode.value === "key" ? "私钥" : "私钥口令";
+  return `上次使用的已保存${what}认证失败，请重新输入。`;
+});
+
 const password = ref("");
 const passphrase = ref("");
 const privateKey = ref("");
@@ -31,7 +38,8 @@ watch(open_, (v) => {
     password.value = "";
     passphrase.value = "";
     privateKey.value = "";
-    remember.value = false;
+    // 重输已保存凭据时默认勾选「记住」：否则档案里那份过期的会留下，下次照旧失败
+    remember.value = isRetry.value;
   }
 });
 
@@ -72,6 +80,7 @@ async function connect() {
     overrides.passphrase = passphrase.value;
   }
   submitting.value = true;
+  // 只关弹框：authRetrySessionId 留给 doLaunch 关闭上次失败的会话
   store.authPromptId = null;
   try {
     if (remember.value) {
@@ -84,7 +93,7 @@ async function connect() {
 }
 
 function cancel() {
-  store.authPromptId = null;
+  store.cancelAuth();
 }
 </script>
 
@@ -100,6 +109,8 @@ function cancel() {
           <div class="target-line">
             {{ profile?.username ? `${profile.username}@` : "" }}{{ profile?.host ?? profile?.name }}
           </div>
+
+          <div v-if="isRetry" class="retry-hint">{{ retryHint }}</div>
 
           <template v-if="mode === 'password'">
             <div class="form-row">
@@ -216,6 +227,17 @@ function cancel() {
   font-size: 12px;
   color: var(--accent);
   margin-bottom: 14px;
+}
+
+.retry-hint {
+  margin-bottom: 12px;
+  padding: 7px 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--warning);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
 }
 
 .form-row {

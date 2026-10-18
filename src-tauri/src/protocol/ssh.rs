@@ -261,13 +261,13 @@ impl SshStream {
     ) -> AppResult<()> {
         if let Some(key_path) = private_key {
             let key = russh::keys::load_secret_key(&key_path, private_key_passphrase.as_deref())
-                .map_err(|e| AppError::Connection(e.to_string()))?;
+                .map_err(|e| AppError::AuthFailed(e.to_string()))?;
             let result = handle
                 .authenticate_publickey(username, PrivateKeyWithHashAlg::new(std::sync::Arc::new(key), None))
                 .await
                 .map_err(|e| AppError::Connection(e.to_string()))?;
             if !result.success() {
-                return Err(AppError::Connection("public key authentication failed".into()));
+                return Err(AppError::AuthFailed("public key authentication failed".into()));
             }
             return Ok(());
         }
@@ -275,11 +275,11 @@ impl SshStream {
             let result = handle.authenticate_password(username, password).await
                 .map_err(|e| AppError::Connection(e.to_string()))?;
             if !result.success() {
-                return Err(AppError::Connection("password authentication failed".into()));
+                return Err(AppError::AuthFailed("password authentication failed".into()));
             }
             return Ok(());
         }
-        Err(AppError::Connection("no auth method provided".into()))
+        Err(AppError::AuthFailed("no auth method provided".into()))
     }
 }
 

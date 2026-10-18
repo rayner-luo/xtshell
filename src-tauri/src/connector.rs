@@ -7,6 +7,15 @@ use crate::protocol::{serial, ssh, telnet, ClosedSignal, OutputSink, TerminalStr
 use crate::session::manager::{SessionConfig, SessionId, SharedManager};
 use crate::zmodem::{ZmodemRegistry, ZmodemState};
 
+/// 认证失败事件负载。仅在会话由已保存档案启动（`config.profile_id` 非空）时发出：
+/// 前端据此弹出凭据重输框，避免"档案里存着过期密码、界面上却无处可改"。
+#[derive(Clone, serde::Serialize)]
+pub struct AuthFailedEvent {
+    pub session_id: SessionId,
+    pub profile_id: String,
+    pub message: String,
+}
+
 pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConfig, app: AppHandle) {
     let base_sink = make_output_sink(&app, mgr.clone(), id.clone());
     let sink = make_zmodem_sink(&app, base_sink, id.clone());
@@ -83,6 +92,19 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
             let _ = guard.inject_output_no_sink(&id, format!("{}\r\n", e).as_bytes());
             let _ = guard.mark_closed(&id);
             let _ = app.emit(&format!("session-error-{id}"), e.to_string());
+            // 认证失败且凭据来自档案：额外通知前端重输（其余错误不回弹输入框）
+            if let AppError::AuthFailed(message) = &e {
+                if let Some(profile_id) = cfg.profile_id.clone() {
+                    let _ = app.emit(
+                        &format!("session-auth-failed-{id}"),
+                        AuthFailedEvent {
+                            session_id: id.clone(),
+                            profile_id,
+                            message: message.clone(),
+                        },
+                    );
+                }
+            }
             let _ = app.emit("sessions-changed", ());
         }
     }

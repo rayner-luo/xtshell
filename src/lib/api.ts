@@ -41,6 +41,22 @@ export function onSessionError(
   return listen<string>(`session-error-${id}`, (e) => cb(e.payload));
 }
 
+/** 使用档案中已保存的凭据认证失败：前端据此弹出凭据重输框 */
+export interface SessionAuthFailed {
+  session_id: string;
+  profile_id: string;
+  message: string;
+}
+
+export function onSessionAuthFailed(
+  id: string,
+  cb: (p: SessionAuthFailed) => void,
+): Promise<UnlistenFn> {
+  return listen<SessionAuthFailed>(`session-auth-failed-${id}`, (e) =>
+    cb(e.payload),
+  );
+}
+
 export function onSessionsChanged(cb: () => void): Promise<UnlistenFn> {
   return listen("sessions-changed", () => cb());
 }

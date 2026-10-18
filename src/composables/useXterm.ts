@@ -10,6 +10,7 @@ import {
   onSessionOutput,
   onSessionClosed,
   onSessionError,
+  onSessionAuthFailed,
   onZmodemRequest,
   onZmodemAskDir,
   onZmodemAskFiles,
@@ -103,6 +104,7 @@ export function useXterm(
   let unlistenOutput: (() => void) | null = null;
   let unlistenClosed: (() => void) | null = null;
   let unlistenError: (() => void) | null = null;
+  let unlistenAuthFailed: (() => void) | null = null;
   let unlistenZmodemRequest: (() => void) | null = null;
   let unlistenZmodemAskDir: (() => void) | null = null;
   let unlistenZmodemAskFiles: (() => void) | null = null;
@@ -155,6 +157,13 @@ export function useXterm(
       void resizeSession(sessionId, cols, rows).catch(() => {});
     });
 
+    // 认证失败且凭据来自已保存档案：弹重输框。
+    // 在 replayBuffer 之前尽早订阅，避免与后端失败事件竞速。
+    unlistenAuthFailed = await onSessionAuthFailed(sessionId, (p) => {
+      if (disposed) return;
+      profilesStore.promptAuthRetry(p.profile_id, p.session_id);
+    });
+
     // 复制/粘贴动作（供按钮栏与右键复用）
     async function pasteFromClipboard() {
       try {
@@ -193,6 +202,7 @@ export function useXterm(
     });
     if (disposed) {
       unlistenOutput();
+      unlistenAuthFailed();
       return;
     }
 
@@ -216,6 +226,7 @@ export function useXterm(
       unlistenOutput();
       unlistenClosed();
       unlistenError();
+      unlistenAuthFailed();
       return;
     }
 
@@ -357,6 +368,7 @@ export function useXterm(
     unlistenOutput?.();
     unlistenClosed?.();
     unlistenError?.();
+    unlistenAuthFailed?.();
     unlistenZmodemRequest?.();
     unlistenZmodemAskDir?.();
     unlistenZmodemAskFiles?.();

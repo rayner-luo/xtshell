@@ -28,6 +28,8 @@ export const useProfilesStore = defineStore("profiles", () => {
   const launchedFrom = ref<Record<string, string>>({});
   // 连接前认证弹框（密码/私钥缺失时）
   const authPromptId = ref<string | null>(null);
+  // 认证失败重输：记录那次失败的会话 id（重连前先关掉它，避免留下 ✗ 标签）
+  const authRetrySessionId = ref<string | null>(null);
   let unlisten: (() => void) | null = null;
 
   function openEdit(p: ProfileSessionView) {
@@ -159,11 +161,37 @@ export const useProfilesStore = defineStore("profiles", () => {
     await doLaunch(id, {});
   }
 
+  /**
+   * 已保存凭据认证失败（后端事件 session-auth-failed-{id}）：
+   * 记住那次失败的会话并弹出重输框，用户填的新凭据随后覆盖档案里过期的那份。
+   */
+  function promptAuthRetry(profileId: string, failedSessionId: string) {
+    if (!profiles.value.some((p) => p.id === profileId)) return;
+    authRetrySessionId.value = failedSessionId;
+    authPromptId.value = profileId;
+  }
+
+  /** 取消重输：只清状态，认证失败的会话留给用户自行关闭 */
+  function cancelAuth() {
+    authPromptId.value = null;
+    authRetrySessionId.value = null;
+  }
+
   /** 认证框确认后实际连接 */
   async function doLaunch(
     id: string,
     overrides: { password?: string; passphrase?: string; private_key?: string },
   ) {
+    // 重输后重连：先关掉上次认证失败的会话，否则每次重试都堆一个 ✗ 标签
+    const failed = authRetrySessionId.value;
+    authRetrySessionId.value = null;
+    if (failed) {
+      try {
+        await useSessionStore().close(failed);
+      } catch {
+        /* 会话可能已被关闭 */
+      }
+    }
     try {
       const sessionId = await launchProfile(id, overrides);
       launchedFrom.value = { ...launchedFrom.value, [sessionId]: id };
@@ -268,6 +296,9 @@ export const useProfilesStore = defineStore("profiles", () => {
     pendingNewFolderId,
     launchedFrom,
     authPromptId,
+    authRetrySessionId,
+    promptAuthRetry,
+    cancelAuth,
     openEdit,
     openNew,
     clearEdit,

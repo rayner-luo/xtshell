@@ -8,6 +8,10 @@ pub enum AppError {
     UnsupportedProtocol(String),
     #[error("{0}")]
     Connection(String),
+    /// 认证失败（用户名/密码/私钥/口令不正确）。与一般 Connection 错误区分开，
+    /// 前端据此弹出凭据重输框。
+    #[error("{0}")]
+    AuthFailed(String),
     #[error("连接超时，请重试")]
     ConnectTimeout,
     #[error("无法解析主机名“{0}”，请检查地址是否正确")]
@@ -47,7 +51,14 @@ pub struct ApiError {
 
 impl From<&AppError> for ApiError {
     fn from(e: &AppError) -> Self {
-        ApiError { code: "error".into(), message: e.to_string() }
+        ApiError {
+            code: match e {
+                AppError::AuthFailed(_) => "auth_failed",
+                _ => "error",
+            }
+            .into(),
+            message: e.to_string(),
+        }
     }
 }
 
@@ -56,3 +67,22 @@ impl From<AppError> for ApiError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auth_failure_gets_dedicated_api_code() {
+        let e = AppError::AuthFailed("password authentication failed".into());
+        let api = ApiError::from(&e);
+        assert_eq!(api.code, "auth_failed");
+        api.message.contains("password").then_some(()).expect("保留原始文案");
+    }
+
+    #[test]
+    fn other_errors_keep_generic_code() {
+        assert_eq!(ApiError::from(AppError::Connection("boom".into())).code, "error");
+        assert_eq!(ApiError::from(AppError::ConnectTimeout).code, "error");
+    }
+}
