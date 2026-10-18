@@ -90,6 +90,25 @@ export function onProfilesChanged(cb: () => void): Promise<UnlistenFn> {
   return listen("profiles-changed", () => cb());
 }
 
+// SSH 主机密钥（首次连接确认 / 变更告警）
+export interface SshHostKeyPrompt {
+  session_id: string;
+  host: string;
+  port: number;
+  key_type: string;
+  fingerprint: string;
+  known_hosts: string;
+}
+
+export const sshHostKeyDecision = (id: string, accept: boolean) =>
+  invoke<void>("ssh_hostkey_decision", { id, accept });
+
+export function onSshHostKeyPrompt(
+  cb: (p: SshHostKeyPrompt) => void,
+): Promise<UnlistenFn> {
+  return listen<SshHostKeyPrompt>("ssh-hostkey-prompt", (e) => cb(e.payload));
+}
+
 // ZMODEM（lrzsz）
 export interface ZmodemProgress {
   kind: string;

@@ -12,6 +12,18 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
     let sink = make_zmodem_sink(&app, base_sink, id.clone());
     let closed = make_closed_signal(&app, mgr.clone(), id.clone());
 
+    let known_hosts = app
+        .path()
+        .app_data_dir()
+        .map(|d| d.join("known_hosts"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("xtshell-known_hosts"));
+    let host_key = ssh::HostKeyCheck {
+        known_hosts,
+        app: app.clone(),
+        session_id: id.clone(),
+        gate: app.state::<Arc<ssh::HostKeyGate>>().inner().clone(),
+    };
+
     let result: Result<Box<dyn TerminalStream>, AppError> = match cfg.protocol.as_str() {
         "ssh" => match ssh::SshStream::connect(
             &cfg.host.clone().unwrap_or_default(),
@@ -24,6 +36,7 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
             24,
             sink,
             closed,
+            host_key,
         )
         .await
         {
@@ -112,6 +125,10 @@ fn make_closed_signal(app: &AppHandle, mgr: SharedManager, id: SessionId) -> Clo
         // 会话关闭：复位 zmodem 模式并终止泵；SFTP 会话一并失效
         crate::zmodem::reset_on_close(&app.state::<ZmodemRegistry>(), &id);
         crate::sftp::reset_on_close(&app.state::<crate::sftp::SftpRegistry>(), &id);
+        // 若主机密钥确认仍在等待，按拒绝收敛
+        app.state::<Arc<crate::protocol::ssh::HostKeyGate>>()
+            .inner()
+            .cancel(&id);
         let mgr2 = mgr.clone();
         let id2 = id.clone();
         tokio::spawn(async move {

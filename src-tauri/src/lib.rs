@@ -26,6 +26,7 @@ pub fn run() {
         .manage(mgr.clone())
         .manage(zmodem::ZmodemRegistry::default())
         .manage(sftp::SftpRegistry::default())
+        .manage(Arc::new(protocol::ssh::HostKeyGate::default()))
         .setup(move |app| {
             // 原生弹出（select 下拉等）默认浅色，与默认主题一致；
             // 深色用户由前端加载后经 set_native_theme 切换。
@@ -60,6 +61,7 @@ pub fn run() {
             commands::create_session,
             commands::close_session,
             commands::list_sessions,
+            commands::ssh_hostkey_decision,
             commands::send_input,
             commands::resize_session,
             commands::get_session_output,

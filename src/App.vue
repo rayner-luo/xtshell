@@ -15,6 +15,7 @@ import AboutDialog from "./components/AboutDialog.vue";
 import ZmodemDialog from "./components/ZmodemDialog.vue";
 import ZmodemConflictDialog from "./components/ZmodemConflictDialog.vue";
 import ConnectAuthDialog from "./components/ConnectAuthDialog.vue";
+import SshHostKeyDialog from "./components/SshHostKeyDialog.vue";
 import { useSftpStore } from "./stores/sftp";
 import { getTerminalActions } from "./lib/terminalBus";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -164,6 +165,7 @@ onBeforeUnmount(() => {
     <ZmodemDialog />
     <ZmodemConflictDialog />
     <ConnectAuthDialog />
+    <SshHostKeyDialog />
     <ContextMenu />
   </div>
 </template>

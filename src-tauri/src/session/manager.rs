@@ -260,12 +260,15 @@ impl SessionManager {
         Ok(self.get(id)?.buffer.tail(n))
     }
 
-    pub async fn close(&mut self, id: &str) -> AppResult<()> {
-        let mut s = self.sessions.remove(id).ok_or_else(|| AppError::SessionNotFound(id.into()))?;
-        if let Some(stream) = s.stream.as_mut() {
-            stream.close().await?;
-        }
-        Ok(())
+    /// 移出会话并返回其终端流（同步操作，不跨 await）。
+    /// 调用方须先释放 manager 锁，再 await `stream.close()`，
+    /// 避免全局锁被慢速网络关闭阻塞。
+    pub fn take_for_close(&mut self, id: &str) -> AppResult<Option<Box<dyn TerminalStream>>> {
+        let mut s = self
+            .sessions
+            .remove(id)
+            .ok_or_else(|| AppError::SessionNotFound(id.into()))?;
+        Ok(s.stream.take())
     }
 
     pub fn mark_closed(&mut self, id: &str) -> AppResult<()> {
@@ -338,7 +341,9 @@ mod tests {
         let mut mgr = SessionManager::new(64);
         let id = mgr.create(SessionConfig::ssh("h", 22, "u", Some("p".into()), None));
         assert_eq!(mgr.list().len(), 1);
-        mgr.close(&id).await.unwrap();
+        if let Some(mut stream) = mgr.take_for_close(&id).unwrap() {
+            stream.close().await.unwrap();
+        }
         assert!(mgr.list().is_empty());
     }
 

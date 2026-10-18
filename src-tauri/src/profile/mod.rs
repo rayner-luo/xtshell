@@ -512,8 +512,6 @@ fn normalize_root(parent: Option<String>) -> Option<String> {
     parent.filter(|p| !p.is_empty() && p != "root")
 }
 
-fn _normalize_helper() {}
-
 pub type SharedProfiles = Arc<Mutex<ProfileStore>>;
 
 #[cfg(test)]

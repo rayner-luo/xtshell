@@ -31,3 +31,6 @@ src-tauri/gen
 
 # opencode 会话数据
 .zcode/
+
+# Windows 下载文件附带的 Zone.Identifier 备用数据流
+*:Zone.Identifier

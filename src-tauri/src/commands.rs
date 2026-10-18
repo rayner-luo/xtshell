@@ -68,13 +68,19 @@ pub async fn create_session(
 pub async fn close_session(
     app: AppHandle,
     mgr: State<'_, SharedManager>,
+    gate: State<'_, std::sync::Arc<crate::protocol::ssh::HostKeyGate>>,
     id: SessionId,
 ) -> Result<(), ApiError> {
-    mgr.lock()
+    // 锁内只做同步移除；stream.close() 在锁外 await（可能涉及网络往返）
+    let stream = mgr
+        .lock()
         .await
-        .close(&id)
-        .await
+        .take_for_close(&id)
         .map_err(ApiError::from)?;
+    gate.cancel(&id);
+    if let Some(mut stream) = stream {
+        stream.close().await.map_err(ApiError::from)?;
+    }
     let _ = app.emit("sessions-changed", ());
     Ok(())
 }
@@ -82,6 +88,16 @@ pub async fn close_session(
 #[tauri::command]
 pub async fn list_sessions(mgr: State<'_, SharedManager>) -> Result<Vec<SessionInfo>, ApiError> {
     Ok(mgr.lock().await.list())
+}
+
+/// 首次连接 SSH 主机时由前端投递确认结果（接受后写入 known_hosts）。
+#[tauri::command]
+pub fn ssh_hostkey_decision(
+    gate: State<'_, std::sync::Arc<crate::protocol::ssh::HostKeyGate>>,
+    id: String,
+    accept: bool,
+) {
+    gate.resolve(&id, accept);
 }
 
 #[tauri::command]

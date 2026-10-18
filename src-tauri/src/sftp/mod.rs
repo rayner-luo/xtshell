@@ -18,6 +18,9 @@ pub struct SftpState {
     handle_slot: Option<SshHandleSlot>,
     session: Option<Arc<SftpSession>>,
     cwd: Option<String>,
+    /// 首次建立 SFTP 通道的串行化锁：并发调用方等一方完成后复用其结果，
+    /// 避免句柄槽被抢走后另一方误报 "not connected"。
+    connect_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -56,6 +59,7 @@ impl SftpRegistry {
             handle_slot: None,
             session: None,
             cwd: None,
+            connect_lock: Arc::new(tokio::sync::Mutex::new(())),
         });
         e.handle_slot = Some(slot);
     }
@@ -82,23 +86,39 @@ async fn ensure_connected(reg: &SftpRegistry, id: &str) -> Result<Arc<SftpSessio
             }
         }
     }
-    // 取句柄槽位（仅 SSH 会话有）
+    // 首次连接串行化：同一会话的并发请求只有一个真正建通道
+    let connect_lock = {
+        let map = reg.0.lock().unwrap();
+        map.get(id)
+            .ok_or_else(|| AppError::Connection("not connected".into()))?
+            .connect_lock
+            .clone()
+    };
+    let _guard = connect_lock.lock().await;
+    {
+        let map = reg.0.lock().unwrap();
+        if let Some(st) = map.get(id) {
+            if let Some(s) = st.session.as_ref() {
+                return Ok(s.clone());
+            }
+        }
+    }
+    // 取句柄槽位（仅 SSH 会话有）；保留槽位副本，断开后仍可重新建立 SFTP
     let slot = {
-        let mut map = reg.0.lock().unwrap();
+        let map = reg.0.lock().unwrap();
         let st = map
-            .get_mut(id)
+            .get(id)
             .ok_or_else(|| AppError::Connection("not connected".into()))?;
         st.handle_slot
-            .take()
+            .clone()
             .ok_or_else(|| AppError::Connection("仅 SSH 会话支持 SFTP".into()))?
     };
-    let session = open_sftp_session(slot).await?;
-    let session = Arc::new(session);
+    let session = Arc::new(open_sftp_session(slot).await?);
     let mut map = reg.0.lock().unwrap();
     let st = map
         .get_mut(id)
         .ok_or_else(|| AppError::Connection("not connected".into()))?;
-    // 期间可能已被并发连接
+    // 期间可能已被并发连接（理论上串行化后不会，保留防御）
     if let Some(s) = st.session.as_ref() {
         return Ok(s.clone());
     }

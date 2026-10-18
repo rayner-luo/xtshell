@@ -7,7 +7,7 @@ use rmcp::{
         StreamableHttpService, session::never::NeverSessionManager, tower::StreamableHttpServerConfig,
     },
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::session::manager::{SessionConfig, SharedManager};
 use crate::profile::SharedProfiles;
@@ -101,12 +101,18 @@ impl McpServer {
         &self,
         Parameters(p): Parameters<IdParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.mgr
+        let stream = self
+            .mgr
             .lock()
             .await
-            .close(&p.session_id)
-            .await
+            .take_for_close(&p.session_id)
             .map_err(map_err)?;
+        if let Some(gate) = self.app.try_state::<std::sync::Arc<crate::protocol::ssh::HostKeyGate>>() {
+            gate.cancel(&p.session_id);
+        }
+        if let Some(mut stream) = stream {
+            stream.close().await.map_err(map_err)?;
+        }
         let _ = self.app.emit("sessions-changed", ());
         Ok(tool_text("closed".into()))
     }
