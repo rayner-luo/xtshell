@@ -112,15 +112,24 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
 
 fn make_output_sink(app: &AppHandle, mgr: SharedManager, id: SessionId) -> OutputSink {
     let app = app.clone();
+    // 每个 chunk 单独 spawn 去抢 manager 锁会让落盘顺序与到达顺序脱钩：
+    // 终端事件在读任务里同步发出（顺序正确），而缓冲/日志由并发任务写入，
+    // 谁先拿到锁不确定，日志里就出现「提示符重复」「凭空多空行」这类乱序脏数据。
+    // 改为一条有序队列 + 单一消费者：sink 只投递（不取锁，仍满足回调契约），
+    // 由消费者按到达顺序落缓冲与日志。
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+    let mgr2 = mgr.clone();
+    let id2 = id.clone();
+    tokio::spawn(async move {
+        while let Some(owned) = rx.recv().await {
+            let mut g = mgr2.lock().await;
+            let _ = g.inject_output_no_sink(&id2, &owned);
+        }
+    });
     Arc::new(move |data: &[u8]| {
         let owned = data.to_vec();
         let _ = app.emit(&format!("session-output-{id}"), owned.clone());
-        let mgr2 = mgr.clone();
-        let id2 = id.clone();
-        tokio::spawn(async move {
-            let mut g = mgr2.lock().await;
-            let _ = g.inject_output_no_sink(&id2, &owned);
-        });
+        let _ = tx.send(owned);
     })
 }
 

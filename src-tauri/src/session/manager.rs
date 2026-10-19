@@ -77,6 +77,8 @@ pub struct Session {
     pub stream: Option<Box<dyn TerminalStream>>,
     pub log_file: Option<std::sync::Mutex<std::fs::File>>,
     pub log_path: Option<String>,
+    /// 会话日志的行模型（把输出整理成终端所见的样子）
+    log_screen: LogScreen,
 }
 
 pub struct SessionManager {
@@ -168,6 +170,330 @@ pub fn strip_ansi(data: &[u8]) -> Vec<u8> {
     out
 }
 
+/// 分页提示在读取边界上被切断时，最多需要滞留的字节数。
+/// 覆盖 ` --More--` 到 `  ---- More ----`（含两侧填充）的规模。
+const PAGER_HOLDBACK_MAX: usize = 32;
+
+/// 片段是否可能是分页提示的前缀（`-{2,}` 后面还没到齐的 `More`）。
+fn is_pager_prefix(s: &str) -> bool {
+    let t = s.trim_start_matches([' ', '\t']);
+    let dashes = t.len() - t.trim_start_matches('-').len();
+    if dashes < 2 {
+        return false;
+    }
+    let rest = t[dashes..].trim_start_matches([' ', '\t']);
+    // `--`、`--More-` 这类尚未写完的提示；后置短横线允许未到齐
+    "more--".starts_with(&rest.to_ascii_lowercase())
+}
+
+/// 缓冲区末尾若可能是被切断的分页提示，返回需要滞留（暂不落盘）的字节数。
+fn pager_partial_tail(buf: &[u8]) -> usize {
+    let max = buf.len().min(PAGER_HOLDBACK_MAX);
+    for take in (2..=max).rev() {
+        if let Ok(s) = std::str::from_utf8(&buf[buf.len() - take..]) {
+            if is_pager_prefix(s) {
+                return take;
+            }
+        }
+    }
+    0
+}
+
+/// `-{2,}` 之后若接一个完整分页提示，返回其结束位置。
+fn pager_end(data: &[u8], after_dashes: usize) -> Option<usize> {
+    let mut j = after_dashes;
+    while j < data.len() && (data[j] == b' ' || data[j] == b'\t') {
+        j += 1;
+    }
+    for expect in *b"more" {
+        if j >= data.len() || data[j].to_ascii_lowercase() != expect {
+            return None;
+        }
+        j += 1;
+    }
+    let mut k = j;
+    while k < data.len() && (data[k] == b' ' || data[k] == b'\t') {
+        k += 1;
+    }
+    let dashes_start = k;
+    while k < data.len() && data[k] == b'-' {
+        k += 1;
+    }
+    if k - dashes_start < 2 {
+        // 允许「短横线 + more」这种没有后置短横线的形态，但要求其后就是行尾，
+        // 免得把普通内容里出现的 `xxx-more` 误删
+        if !(k >= data.len() || data[k] == b'\r' || data[k] == b'\n') {
+            return None;
+        }
+        return Some(k);
+    }
+    // 吞掉提示后的填充空白（设备用它填满整行）
+    while k < data.len() && (data[k] == b' ' || data[k] == b'\t') {
+        k += 1;
+    }
+    Some(k)
+}
+
+/// 去掉输入流里的分页提示（` --More--`、`  ---- More ----` 等），
+/// 连同提示前后的填充空白一起丢弃。
+///
+/// 设备把提示写进输出流，按空格续屏后用 `\r` 覆盖它；日志不做屏幕模拟，
+/// 这些提示就成了脏数据，因此在落盘前过滤。
+fn strip_pager(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(data.len());
+    let mut i = 0;
+    while i < data.len() {
+        if data[i] == b'-' {
+            let mut j = i;
+            while j < data.len() && data[j] == b'-' {
+                j += 1;
+            }
+            if j - i >= 2 {
+                if let Some(end) = pager_end(data, j) {
+                    // 提示前的填充空白也一并丢弃
+                    while matches!(out.last(), Some(b) if *b == b' ' || *b == b'\t') {
+                        out.pop();
+                    }
+                    i = end;
+                    continue;
+                }
+            }
+            out.extend_from_slice(&data[i..j]);
+            i = j;
+            continue;
+        }
+        out.push(data[i]);
+        i += 1;
+    }
+    out
+}
+
+/// 从 `i` 开始的转义序列在缓冲区里是否已完整（不完整则需滞留等下一批字节）。
+fn escape_complete(data: &[u8], i: usize) -> bool {
+    let mut j = i + 1;
+    if j >= data.len() {
+        return false;
+    }
+    match data[j] {
+        b'[' => {
+            j += 1;
+            while j < data.len() && (0x20..=0x3f).contains(&data[j]) {
+                j += 1;
+            }
+            j < data.len()
+        }
+        b']' | b'P' | b'X' | b'^' | b'_' => {
+            j += 1;
+            while j < data.len() {
+                if data[j] == 0x07 {
+                    return true;
+                }
+                if data[j] == 0x1b {
+                    return j + 1 < data.len();
+                }
+                j += 1;
+            }
+            false
+        }
+        _ => true,
+    }
+}
+
+/// 取 CSI 参数串里第 `idx` 个数值（缺失或非法按 0 处理）。
+fn csi_param(params: &[u8], idx: usize) -> usize {
+    let s = String::from_utf8_lossy(params);
+    let s = s.trim_start_matches(['?', '<', '=', '>']);
+    s.split(';').nth(idx).unwrap_or("").trim().parse::<usize>().unwrap_or(0)
+}
+
+/// 会话日志的行模型：把输出整理成「终端屏幕上看到的样子」再落盘。
+///
+/// 直接按字节落盘会跑出两类脏数据（实测反馈）：
+///   - readline 打印命令输出前会发一个裸 CR（CR LF + 关闭括号粘贴 + CR + 输出），
+///     终端里只是回到行首，编辑器却把孤立 CR 当换行 → 日志凭空多出空行；
+///   - 重画提示符同样是裸 CR + 相同内容，终端里互相覆盖只看见一份，
+///     按字节落盘就成了 `root@…:~# root@…:~# ` 这样的重复。
+///
+/// 所以这里实现一个够用的行模型：CR 回行首（覆盖写）、LF 换行、BS 退格、
+/// TAB 按 8 列对齐；CSI 只解释影响行内容的擦除与光标移动。
+/// 被覆盖掉的旧内容不保留 —— 与终端所见一致。
+struct LogScreen {
+    /// 已收下但尚未定稿的输入：转义序列或分页提示可能被读取边界切断
+    pending: Vec<u8>,
+    /// 当前行内容
+    line: Vec<u8>,
+    /// 当前写入列
+    col: usize,
+}
+
+impl LogScreen {
+    fn new() -> Self {
+        LogScreen { pending: Vec::new(), line: Vec::new(), col: 0 }
+    }
+
+    /// 收下一批输出，返回可以立即落盘的字节（已定稿的整行）。
+    fn push(&mut self, data: &[u8]) -> Vec<u8> {
+        self.pending.extend_from_slice(data);
+        let hold = self.holdback();
+        let upto = self.pending.len() - hold;
+        if upto == 0 {
+            return Vec::new();
+        }
+        let chunk: Vec<u8> = self.pending.drain(..upto).collect();
+        let chunk = strip_pager(&chunk);
+        let mut out = Vec::new();
+        self.feed(&chunk, &mut out);
+        out
+    }
+
+    /// 收尾：滞留输入与未定稿的行也一并吐出（停止日志 / 会话结束时调用）。
+    fn finish(&mut self) -> Vec<u8> {
+        let chunk = strip_pager(&std::mem::take(&mut self.pending));
+        let mut out = Vec::new();
+        self.feed(&chunk, &mut out);
+        if !self.line.is_empty() {
+            self.emit_line(&mut out);
+        }
+        out
+    }
+
+    /// 需要滞留、暂不处理的尾部长度：不完整的转义序列，或疑似被切断的分页提示。
+    fn holdback(&self) -> usize {
+        if let Some(i) = self.pending.iter().rposition(|b| *b == 0x1b) {
+            if !escape_complete(&self.pending, i) {
+                return self.pending.len() - i;
+            }
+        }
+        pager_partial_tail(&self.pending)
+    }
+
+    fn feed(&mut self, data: &[u8], out: &mut Vec<u8>) {
+        let mut i = 0;
+        while i < data.len() {
+            let b = data[i];
+            match b {
+                b'\r' => {
+                    self.col = 0;
+                    i += 1;
+                }
+                // VT/FF 在文本终端里同样是换行
+                b'\n' | 0x0b | 0x0c => {
+                    self.emit_line(out);
+                    i += 1;
+                }
+                0x08 => {
+                    self.col = self.col.saturating_sub(1);
+                    i += 1;
+                }
+                b'\t' => {
+                    let stop = (self.col / 8 + 1) * 8;
+                    while self.col < stop {
+                        self.put(b' ');
+                    }
+                    i += 1;
+                }
+                0x1b => i = self.escape(data, i),
+                0x07 => i += 1,
+                c if c < 0x20 => i += 1,
+                c => {
+                    self.put(c);
+                    i += 1;
+                }
+            }
+        }
+    }
+
+    /// 在 `col` 处写入一个字节：覆盖原内容，必要时用空格补齐。
+    fn put(&mut self, b: u8) {
+        if self.col < self.line.len() {
+            self.line[self.col] = b;
+        } else {
+            while self.line.len() < self.col {
+                self.line.push(b' ');
+            }
+            self.line.push(b);
+        }
+        self.col += 1;
+    }
+
+    /// 定稿当前行。空行照样保留 —— 设备输出里的空行在终端上也是空行。
+    fn emit_line(&mut self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.line);
+        out.extend_from_slice(b"\r\n");
+        self.line.clear();
+        self.col = 0;
+    }
+
+    /// 处理一个转义序列，返回其后的位置。
+    fn escape(&mut self, data: &[u8], i: usize) -> usize {
+        let mut j = i + 1;
+        if j >= data.len() {
+            return data.len();
+        }
+        match data[j] {
+            b'[' => {
+                j += 1;
+                let start = j;
+                while j < data.len() && (0x20..=0x3f).contains(&data[j]) {
+                    j += 1;
+                }
+                if j >= data.len() {
+                    return data.len();
+                }
+                let params: Vec<u8> = data[start..j].to_vec();
+                let cmd = data[j];
+                j += 1;
+                let n = csi_param(&params, 0);
+                match cmd {
+                    // EL：擦除行内容（光标不动）
+                    b'K' => match n {
+                        0 => {
+                            let cut = self.col.min(self.line.len());
+                            self.line.truncate(cut);
+                        }
+                        1 => {
+                            let cut = self.col.min(self.line.len());
+                            self.line[..cut].fill(b' ');
+                        }
+                        _ => {
+                            self.line.clear();
+                            self.col = 0;
+                        }
+                    },
+                    // 光标移动：只影响当前行的写入列
+                    b'C' => self.col += n.max(1),
+                    b'D' => self.col = self.col.saturating_sub(n.max(1)),
+                    b'G' => self.col = n.saturating_sub(1),
+                    b'H' | b'f' => self.col = csi_param(&params, 1).saturating_sub(1),
+                    b'J' => {
+                        if n >= 2 {
+                            self.line.clear();
+                            self.col = 0;
+                        }
+                    }
+                    _ => {}
+                }
+                j
+            }
+            // OSC / DCS 等：跳过直到 BEL 或 ST
+            b']' | b'P' | b'X' | b'^' | b'_' => {
+                j += 1;
+                while j < data.len() {
+                    if data[j] == 0x07 {
+                        return j + 1;
+                    }
+                    if data[j] == 0x1b {
+                        return (j + 2).min(data.len());
+                    }
+                    j += 1;
+                }
+                data.len()
+            }
+            _ => j + 1,
+        }
+    }
+}
+
 impl SessionManager {
     pub fn new(buf_cap: usize) -> Self {
         SessionManager { sessions: HashMap::new(), buf_cap }
@@ -183,6 +509,7 @@ impl SessionManager {
             stream: None,
             log_file: None,
             log_path: None,
+            log_screen: LogScreen::new(),
         };
         self.sessions.insert(id.clone(), session);
         id
@@ -214,40 +541,53 @@ impl SessionManager {
     pub fn inject_output_no_sink(&mut self, id: &str, data: &[u8]) -> AppResult<()> {
         let s = self.get_mut(id)?;
         s.buffer.append(data);
-        if let Some(f) = s.log_file.as_ref() {
-            use std::io::Write;
-            if let Ok(mut file) = f.lock() {
-                let _ = file.write_all(&strip_ansi(data));
-                let _ = file.flush();
+        let Session { log_file, log_screen, .. } = s;
+        if let Some(f) = log_file.as_ref() {
+            let out = log_screen.push(data);
+            if !out.is_empty() {
+                use std::io::Write;
+                if let Ok(mut file) = f.lock() {
+                    let _ = file.write_all(&out);
+                    let _ = file.flush();
+                }
             }
         }
         Ok(())
     }
 
-    pub fn start_log(&mut self, id: &str, dir: &str, timestamp: &str) -> AppResult<String> {
+    /// 开始把会话输出记录到 `path`（文件名由前端指定，缺失的父目录自动创建）。
+    /// 返回实际使用的路径。
+    pub fn start_log(&mut self, id: &str, path: &str) -> AppResult<String> {
         let s = self.get_mut(id)?;
-        let target = s
-            .config
-            .host
-            .clone()
-            .or_else(|| s.config.serial_port.clone())
-            .unwrap_or_else(|| s.config.protocol.clone());
-        let safe_target: String = target
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
-            .collect();
-        let file_name = format!("{timestamp}_{safe_target}.log");
-        std::fs::create_dir_all(dir).map_err(AppError::Io)?;
-        let full_path = std::path::Path::new(dir).join(&file_name);
-        let file = std::fs::File::create(&full_path).map_err(AppError::Io)?;
-        let path_str = full_path.to_string_lossy().to_string();
+        let full_path = std::path::Path::new(path);
+        if let Some(parent) = full_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(AppError::Io)?;
+            }
+        }
+        let file = std::fs::File::create(full_path).map_err(AppError::Io)?;
         s.log_file = Some(std::sync::Mutex::new(file));
-        s.log_path = Some(path_str.clone());
-        Ok(path_str)
+        s.log_screen = LogScreen::new();
+        s.log_path = Some(path.to_string());
+        Ok(path.to_string())
     }
 
     pub fn stop_log(&mut self, id: &str) -> AppResult<String> {
         let s = self.get_mut(id)?;
+        {
+            // 收尾：滞留输入与未定稿的行也落盘，避免丢内容
+            let Session { log_file, log_screen, .. } = s;
+            let tail = log_screen.finish();
+            if let Some(f) = log_file.as_ref() {
+                if !tail.is_empty() {
+                    use std::io::Write;
+                    if let Ok(mut file) = f.lock() {
+                        let _ = file.write_all(&tail);
+                        let _ = file.flush();
+                    }
+                }
+            }
+        }
         s.log_file = None;
         s.log_path.take().ok_or_else(|| AppError::Connection("session is not logging".into()))
     }
@@ -360,18 +700,117 @@ mod tests {
         mgr.inject_output_no_sink(&id, b"not logged").unwrap();
         assert!(mgr.log_path(&id).is_none());
 
-        let path = mgr.start_log(&id, dir.to_str().unwrap(), "20260101_000000").unwrap();
-        assert!(path.ends_with("20260101_000000_1.2.3.4.log"));
-        mgr.inject_output_no_sink(&id, b"hello log").unwrap();
+        let log_file = dir.join("20260101_000000.txt");
+        let path = mgr.start_log(&id, log_file.to_str().unwrap()).unwrap();
+        assert!(path.ends_with("20260101_000000.txt"));
+        mgr.inject_output_no_sink(&id, b"hello log\r\n").unwrap();
 
         assert_eq!(mgr.log_path(&id).as_deref(), Some(path.as_str()));
+        // 整行即落盘
         let content = std::fs::read(&path).unwrap();
-        assert_eq!(content, b"hello log");
+        assert_eq!(content, b"hello log\r\n");
 
+        // 没有换行结尾的残缺行在停止时收尾落盘，不丢内容
+        mgr.inject_output_no_sink(&id, b"tail without newline").unwrap();
         let stopped = mgr.stop_log(&id).unwrap();
         assert_eq!(stopped, path);
+        let content = std::fs::read(&path).unwrap();
+        assert_eq!(content, b"hello log\r\ntail without newline\r\n");
         assert!(mgr.stop_log(&id).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn log_screen_matches_terminal_for_readline_output() {
+        // 本机 PTY 复现的真实字节：输入 `echo hi` 回车后是
+        // CR LF + `\x1b[?2004l` + CR + `hi` + CR LF + `\x1b[?2004h` + 新提示符。
+        // 终端上是三行；那个裸 CR 不该在日志里变成空行。
+        let mut s = LogScreen::new();
+        let mut out = s.push(b"root@host:~# echo hi");
+        out.extend(s.push(b"\r\n\x1b[?2004l\rhi\r\n\x1b[?2004hroot@host:~# "));
+        out.extend(s.finish());
+        assert_eq!(out, b"root@host:~# echo hi\r\nhi\r\nroot@host:~# \r\n");
+    }
+
+    #[test]
+    fn log_screen_collapses_redrawn_prompt() {
+        // readline 重画提示符：裸 CR + 相同内容。终端只看见一份，
+        // 日志也必须只有一份（旧实现会写成 `root@…:~# root@…:~# `）。
+        let mut s = LogScreen::new();
+        let mut out = s.push(b"root@host:~# \rroot@host:~# \rroot@host:~# ");
+        out.extend(s.finish());
+        assert_eq!(out, b"root@host:~# \r\n");
+    }
+
+    #[test]
+    fn log_screen_keeps_real_blank_lines_only() {
+        // `\r\r\n` 是终端里的一次换行（编辑器会显示成两个）；`\r\n\r\n` 才是真的空行。
+        let mut s = LogScreen::new();
+        let mut out = s.push(b"a\r\r\n\r\nb\r\n");
+        out.extend(s.finish());
+        assert_eq!(out, b"a\r\n\r\nb\r\n");
+    }
+
+    #[test]
+    fn log_screen_applies_erase_and_redraw() {
+        let mut s = LogScreen::new();
+        let mut out = s.push(b"root@host:~# ls\x1b[K\rroot@host:~# ls -l");
+        out.extend(s.finish());
+        assert_eq!(out, b"root@host:~# ls -l\r\n");
+    }
+
+    #[test]
+    fn log_screen_holds_split_escape_sequence() {
+        // 转义序列被读取边界切断：先滞留，拼接后再处理
+        let mut s = LogScreen::new();
+        assert_eq!(s.push(b"abc\x1b["), b"");
+        let mut out = s.push(b"Kdef");
+        out.extend(s.finish());
+        assert_eq!(out, b"abcdef\r\n");
+    }
+
+    #[test]
+    fn log_screen_expands_tabs() {
+        let mut s = LogScreen::new();
+        let mut out = s.push(b"ab\tcd\r\n");
+        out.extend(s.finish());
+        assert_eq!(out, b"ab      cd\r\n");
+    }
+
+    #[tokio::test]
+    async fn session_log_filters_pager_prompt() {
+        // 交换机/路由器的分页提示不该进日志：锐捷 ` --More--`、华为 `  ---- More ----`
+        let dir = std::env::temp_dir().join(format!("xtshell-log-pager-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut mgr = SessionManager::new(64);
+        let id = mgr.create(SessionConfig::ssh("sw", 22, "admin", None, None));
+        let log_file = dir.join("pager.txt");
+        mgr.start_log(&id, log_file.to_str().unwrap()).unwrap();
+        mgr.inject_output_no_sink(&id, b"!\r\n --More--           vlan 1\r\n").unwrap();
+        mgr.inject_output_no_sink(&id, b"  ---- More ----      ip route\r\n").unwrap();
+        mgr.stop_log(&id).unwrap();
+        let text = std::fs::read_to_string(&log_file).unwrap();
+        assert_eq!(text, "!\r\nvlan 1\r\nip route\r\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn strip_pager_handles_split_boundaries() {
+        // 提示被读取边界切断：前半段应被滞留，与后半段拼接后再过滤
+        let a = b"!\r\n --Mo";
+        assert_eq!(pager_partial_tail(a), 5);
+        let mut buf = a.to_vec();
+        buf.extend_from_slice(b"re--      vlan 1\r\n");
+        let hold = pager_partial_tail(&buf);
+        assert_eq!(hold, 0);
+        assert_eq!(strip_pager(&buf), b"!\r\nvlan 1\r\n");
+    }
+
+    #[test]
+    fn strip_pager_keeps_plain_content() {
+        // 普通短横线分隔行与含 more 的正文都不该被误删
+        let d = b"----------\r\nno more words\r\n";
+        assert_eq!(strip_pager(d), d.to_vec());
     }
 
     #[test]
