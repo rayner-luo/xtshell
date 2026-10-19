@@ -160,14 +160,14 @@ pub async fn reconnect_session(
 pub async fn set_session_log(
     mgr: State<'_, SharedManager>,
     id: SessionId,
-    dir: Option<String>,
+    path: Option<String>,
 ) -> Result<Option<String>, ApiError> {
     let mut guard = mgr.lock().await;
-    match dir {
-        Some(dir) => {
-            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-            let path = guard.start_log(&id, &dir, &timestamp).map_err(ApiError::from)?;
-            Ok(Some(path))
+    match path {
+        Some(path) => {
+            // 文件名由前端在「另存为」里指定（默认 `年月日时分秒.txt`）
+            let saved = guard.start_log(&id, &path).map_err(ApiError::from)?;
+            Ok(Some(saved))
         }
         None => {
             guard.stop_log(&id).map_err(ApiError::from)?;

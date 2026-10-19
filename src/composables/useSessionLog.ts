@@ -1,7 +1,17 @@
 import { computed } from "vue";
 import { useSessionStore } from "../stores/session";
 import { setSessionLog } from "../lib/api";
-import { open as pickDir } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
+
+/** 默认日志文件名：年月日时分秒.txt（例如 20261019024713.txt） */
+function defaultLogName(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
+    `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.txt`
+  );
+}
 
 /** 会话日志开关：工具栏日志按钮与会话菜单共用 */
 export function useSessionLog() {
@@ -24,16 +34,18 @@ export function useSessionLog() {
         await setSessionLog(id, null);
         store.setLogging(id, null);
       } else {
-        const dir = await pickDir({
-          directory: true,
-          title: "选择会话日志保存目录",
+        // 「另存为」：目录与文件名都由用户指定，默认用时间戳命名
+        const path = await save({
+          title: "保存会话日志",
+          defaultPath: defaultLogName(),
+          filters: [{ name: "文本日志", extensions: ["txt", "log"] }],
         });
-        if (!dir) return;
-        const path = await setSessionLog(id, dir);
-        store.setLogging(id, path ?? null);
+        if (!path) return;
+        const saved = await setSessionLog(id, path);
+        store.setLogging(id, saved ?? null);
       }
     } catch {
-      /* 选目录取消或命令失败时静默 */
+      /* 取消选择或命令失败时静默 */
     }
   }
 

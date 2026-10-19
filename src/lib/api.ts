@@ -99,8 +99,8 @@ export const moveFolder = (id: string, parent: string | null) =>
   invoke<void>("move_folder", { id, parent });
 export const listSerialPorts = () =>
   invoke<SerialPortInfo[]>("list_serial_ports");
-export const setSessionLog = (id: string, dir: string | null) =>
-  invoke<string | null>("set_session_log", { id, dir });
+export const setSessionLog = (id: string, path: string | null) =>
+  invoke<string | null>("set_session_log", { id, path });
 
 export function onProfilesChanged(cb: () => void): Promise<UnlistenFn> {
   return listen("profiles-changed", () => cb());
