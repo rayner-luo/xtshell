@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+const HOMEPAGE = "https://github.com/rayner-luo/xtshell";
 
 const props = defineProps<{
   open: boolean;
@@ -18,6 +21,14 @@ onMounted(async () => {
     version.value = "";
   }
 });
+
+async function openHomepage() {
+  try {
+    await openUrl(HOMEPAGE);
+  } catch {
+    /* 打不开时静默 */
+  }
+}
 
 function close() {
   emit("update:open", false);
@@ -45,6 +56,12 @@ function close() {
             <span class="about-label">邮箱</span>
             <span class="about-value">rayner.luo@qq.com</span>
           </div>
+          <div class="about-row">
+            <span class="about-label">项目</span>
+            <button class="about-link" :title="HOMEPAGE" @click="openHomepage">
+              {{ HOMEPAGE }}
+            </button>
+          </div>
         </div>
         <div class="dialog-footer">
           <button class="btn primary" @click="close">关闭</button>
@@ -66,7 +83,7 @@ function close() {
 }
 
 .dialog {
-  width: 320px;
+  width: 420px;
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -125,6 +142,23 @@ function close() {
 .about-value {
   font-size: 12px;
   color: var(--text-body);
+}
+
+.about-link {
+  padding: 0;
+  font-size: 12px;
+  font-family: Consolas, monospace;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  word-break: break-all;
+}
+
+.about-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
 .dialog-footer {
