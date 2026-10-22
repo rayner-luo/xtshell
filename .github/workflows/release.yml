@@ -2,7 +2,7 @@ name: Release
 
 # 推送 v* 标签或手动触发：三平台（Windows/macOS/Linux）打包并发布到 GitHub Release。
 # 注意：macOS 安装包只能在 macOS 上构建（Xcode 工具链限制），因此依赖 CI 的 macOS runner。
-# 本地 Windows 交叉编译见 AGENTS.md「跨平台打包」一节。
+# 本地 Windows 交叉编译：见 README 的构建说明，或直接依赖本 workflow 的 windows job。
 on:
   push:
     tags:

@@ -46,4 +46,6 @@ src-tauri/src/
 src-tauri/vendor/    为兼容老式交换机打过补丁的 russh / ssh-encoding
 ```
 
-更多架构与开发约定见 `AGENTS.md`，设计背景见 `设计方案.md`。
+## 许可证
+
+[MIT](LICENSE)
