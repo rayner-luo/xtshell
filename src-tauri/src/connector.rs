@@ -54,6 +54,8 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
                 let slot = stream.handle_slot();
                 app.state::<crate::sftp::SftpRegistry>()
                     .register_handle(&id, slot);
+                // 本地端口转发（仅 SSH）：连接成功后启动本地监听
+                stream.start_forwards(cfg.forwards.clone());
                 Ok(Box::new(stream))
             }
             Err(e) => Err(e),

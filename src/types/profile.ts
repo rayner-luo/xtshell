@@ -23,9 +23,18 @@ export interface ProfileSessionView {
   parity?: string;
   encoding?: string;
   terminal_appearance?: TerminalAppearance | null;
+  forwards?: PortForward[];
   created_at: string;
   has_password: boolean;
   has_passphrase: boolean;
+}
+
+/** SSH 本地端口转发：本地监听 → 经会话转发到远端 */
+export interface PortForward {
+  local_addr: string;
+  local_port: number;
+  remote_addr: string;
+  remote_port: number;
 }
 
 export interface TerminalAppearance {
@@ -59,6 +68,7 @@ export interface SaveProfileRequest {
   stop_bits?: number;
   encoding?: string;
   terminal_appearance?: TerminalAppearance | null;
+  forwards?: PortForward[];
   parity?: string;
 }
 

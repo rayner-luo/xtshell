@@ -225,6 +225,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         parity: p.parity,
         terminal_appearance: p.terminal_appearance,
         encoding: p.encoding,
+        forwards: p.forwards ?? [],
       });
       await refresh();
     } catch (e) {
@@ -253,6 +254,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         parity: p.parity,
         terminal_appearance: p.terminal_appearance ?? undefined,
         encoding,
+        forwards: p.forwards ?? [],
       });
       await refresh();
     } catch (e) {

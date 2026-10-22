@@ -30,6 +30,9 @@ pub struct SessionConfig {
     /// SSH 认证失败时前端据此弹出凭据重输框。手工新建的会话为 None。
     #[serde(default)]
     pub profile_id: Option<String>,
+    /// SSH 本地端口转发列表（连接成功后启动监听）
+    #[serde(default)]
+    pub forwards: Vec<crate::profile::PortForward>,
 }
 
 impl SessionConfig {

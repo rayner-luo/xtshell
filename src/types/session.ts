@@ -1,3 +1,5 @@
+import type { PortForward } from "./profile";
+
 export type Protocol = "ssh" | "telnet" | "serial";
 export type SessionState = "connecting" | "connected" | "closed";
 
@@ -31,4 +33,6 @@ export interface SessionConfig {
   data_bits?: number;
   stop_bits?: number;
   parity?: string;
+  /** SSH 本地端口转发（仅 ssh 生效） */
+  forwards?: PortForward[];
 }

@@ -248,8 +248,68 @@ impl SshStream {
     }
 
     /// 句柄槽位（供 SFTP 等子系统在既有 SSH 连接上开新 channel）
+    /// 句柄槽位（供 SFTP 等子系统在既有 SSH 连接上开新 channel）
     pub fn handle_slot(&self) -> SshHandleSlot {
         self.session.clone()
+    }
+
+    /// 启动 SSH 本地端口转发：为每条转发在本地监听，收到连接后经既有 SSH
+    /// 连接开 direct-tcpip 通道，再双向转发字节。绑定/开通道失败写入应用日志。
+    pub fn start_forwards(&self, forwards: Vec<crate::profile::PortForward>) {
+        for f in forwards.into_iter().filter(|f| f.is_valid()) {
+            let slot = self.session.clone();
+            let listen = f.listen_addr();
+            let (target_host, target_port) = f.target();
+            tokio::spawn(async move {
+                let listener = match tokio::net::TcpListener::bind(&listen).await {
+                    Ok(listener) => listener,
+                    Err(e) => {
+                        crate::applog::error(&format!("端口转发监听失败 {listen}: {e}"));
+                        return;
+                    }
+                };
+                crate::applog::info(&format!("端口转发已启动 {listen} -> {target_host}:{target_port}"));
+                loop {
+                    let (mut inbound, peer) = match listener.accept().await {
+                        Ok(pair) => pair,
+                        Err(e) => {
+                            crate::applog::error(&format!("端口转发接受连接失败 {listen}: {e}"));
+                            break;
+                        }
+                    };
+                    let slot = slot.clone();
+                    let host = target_host.clone();
+                    let origin_addr = peer.ip().to_string();
+                    let origin_port = peer.port() as u32;
+                    tokio::spawn(async move {
+                        // russh 的 Handle 不可 clone，只在开通道期间短暂持锁
+                        let opened = {
+                            let guard = slot.lock().await;
+                            match guard.as_ref() {
+                                Some(handle) => handle
+                                    .channel_open_direct_tcpip(
+                                        host.clone(),
+                                        target_port as u32,
+                                        origin_addr,
+                                        origin_port,
+                                    )
+                                    .await,
+                                None => return,
+                            }
+                        };
+                        let channel = match opened {
+                            Ok(channel) => channel,
+                            Err(e) => {
+                                crate::applog::error(&format!("端口转发打开通道失败 {host}:{target_port}: {e}"));
+                                return;
+                            }
+                        };
+                        let mut outbound = channel.into_stream();
+                        let _ = tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await;
+                    });
+                }
+            });
+        }
     }
 
     async fn authenticate(

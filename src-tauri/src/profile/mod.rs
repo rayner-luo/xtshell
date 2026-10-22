@@ -30,6 +30,45 @@ pub struct TerminalAppearance {
     pub color_scheme: Option<String>,
 }
 
+/// SSH 本地端口转发：本地监听 local_addr:local_port，经既有 SSH 连接
+/// 转发到远端 remote_addr:remote_port（direct-tcpip 通道）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default, rename_all = "snake_case")]
+pub struct PortForward {
+    pub local_addr: String,
+    pub local_port: u16,
+    pub remote_addr: String,
+    pub remote_port: u16,
+}
+
+impl PortForward {
+    /// 本地监听地址（留空按 127.0.0.1）
+    pub fn listen_addr(&self) -> String {
+        let host = if self.local_addr.trim().is_empty() {
+            "127.0.0.1"
+        } else {
+            self.local_addr.trim()
+        };
+        format!("{host}:{}", self.local_port)
+    }
+
+    /// 远端目标（地址留空按 127.0.0.1；端口留空按本地端口）
+    pub fn target(&self) -> (String, u16) {
+        let host = if self.remote_addr.trim().is_empty() {
+            "127.0.0.1".to_string()
+        } else {
+            self.remote_addr.trim().to_string()
+        };
+        let port = if self.remote_port == 0 { self.local_port } else { self.remote_port };
+        (host, port)
+    }
+
+    /// 只有本地端口有效才启用
+    pub fn is_valid(&self) -> bool {
+        self.local_port != 0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileSession {
     pub id: String,
@@ -66,6 +105,9 @@ pub struct ProfileSession {
     pub encoding: Option<String>,
     #[serde(default)]
     pub terminal_appearance: Option<TerminalAppearance>,
+    /// SSH 本地端口转发列表（非 SSH 协议保存时清空）
+    #[serde(default)]
+    pub forwards: Vec<PortForward>,
     pub created_at: String,
 }
 
@@ -97,6 +139,8 @@ pub struct ProfileSessionView {
     pub encoding: Option<String>,
     #[serde(default)]
     pub terminal_appearance: Option<TerminalAppearance>,
+    #[serde(default)]
+    pub forwards: Vec<PortForward>,
     pub created_at: String,
     pub has_password: bool,
     pub has_passphrase: bool,
@@ -145,6 +189,8 @@ pub struct SaveProfileRequest {
     pub encoding: Option<String>,
     #[serde(default)]
     pub terminal_appearance: Option<TerminalAppearance>,
+    #[serde(default)]
+    pub forwards: Vec<PortForward>,
 }
 
 pub struct ProfileStore {
@@ -215,6 +261,7 @@ impl ProfileStore {
             parity: s.parity.clone(),
             encoding: s.encoding.clone(),
             terminal_appearance: s.terminal_appearance.clone(),
+            forwards: s.forwards.clone(),
             created_at: s.created_at.clone(),
                     has_password: s.password_enc.is_some(),
                     has_passphrase: s.private_key_passphrase_enc.is_some(),
@@ -379,6 +426,13 @@ impl ProfileStore {
             None => now,
         };
 
+        // 端口转发只对 SSH 有意义：非 SSH 一律清空，避免切换协议后留下脏数据
+        let forwards: Vec<PortForward> = if req.protocol == "ssh" {
+            req.forwards.into_iter().filter(|f| f.is_valid()).collect()
+        } else {
+            Vec::new()
+        };
+
         let new_entry = ProfileSession {
             id: id.clone(),
             name: req.name,
@@ -399,6 +453,7 @@ impl ProfileStore {
             parity: req.parity,
             encoding: req.encoding,
             terminal_appearance: req.terminal_appearance,
+            forwards,
             created_at,
         };
 
@@ -479,6 +534,7 @@ impl ProfileStore {
             stop_bits: p.stop_bits,
             parity: p.parity.clone(),
             profile_id: Some(p.id.clone()),
+            forwards: p.forwards.clone(),
         })
     }
 
@@ -646,5 +702,30 @@ mod tests {
         assert_eq!(cfg.port, Some(2222));
         // 认证失败后前端据此弹凭据重输框
         assert_eq!(cfg.profile_id.as_deref(), Some(id.as_str()));
+    }
+
+    #[test]
+    fn port_forward_normalizes_defaults() {
+        let f = PortForward {
+            local_addr: String::new(),
+            local_port: 8080,
+            remote_addr: String::new(),
+            remote_port: 0,
+        };
+        assert_eq!(f.listen_addr(), "127.0.0.1:8080");
+        assert_eq!(f.target(), ("127.0.0.1".to_string(), 8080));
+        assert!(f.is_valid());
+
+        let g = PortForward {
+            local_addr: " 0.0.0.0 ".into(),
+            local_port: 2222,
+            remote_addr: "10.0.0.5".into(),
+            remote_port: 22,
+        };
+        assert_eq!(g.listen_addr(), "0.0.0.0:2222");
+        assert_eq!(g.target(), ("10.0.0.5".to_string(), 22));
+
+        // 本地端口为 0 视为未配置，不启动
+        assert!(!PortForward::default().is_valid());
     }
 }
