@@ -21,7 +21,6 @@ interface SavedSettings {
   fontFamily: string;
   fontSize: number;
   theme: ThemeName;
-  encoding: Encoding;
   colorScheme: TerminalColorScheme;
 }
 
@@ -37,7 +36,7 @@ function load(): SavedSettings {
             ? parsed.fontSize
             : 13,
         theme: parsed.theme === "dark" ? "dark" : "light",
-        encoding: typeof parsed.encoding === "string" ? parsed.encoding as Encoding : "utf-8",
+        // 编码不持久化：每次启动都从 UTF-8 起步（编码是会话/档案级属性）
         colorScheme: parsed.colorScheme === "light" || parsed.colorScheme === "dark"
           || parsed.colorScheme === "solarized-dark" || parsed.colorScheme === "solarized-light"
           ? parsed.colorScheme
@@ -51,7 +50,6 @@ function load(): SavedSettings {
     fontFamily: fontOptions[0].value,
     fontSize: 13,
     theme: "light",
-    encoding: "utf-8",
     colorScheme: "dark",
   } satisfies SavedSettings;
 }
@@ -67,11 +65,11 @@ export const useSettingsStore = defineStore("settings", () => {
   const fontFamily = ref<string>(saved.fontFamily);
   const fontSize = ref<number>(saved.fontSize);
   const theme = ref<ThemeName>(saved.theme);
-  const encoding = ref<Encoding>(saved.encoding);
+  const encoding = ref<Encoding>("utf-8");
   const colorScheme = ref<TerminalColorScheme>(saved.colorScheme);
 
   watch(
-    [fontFamily, fontSize, theme, encoding, colorScheme],
+    [fontFamily, fontSize, theme, colorScheme],
     () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -79,7 +77,6 @@ export const useSettingsStore = defineStore("settings", () => {
           fontFamily: fontFamily.value,
           fontSize: fontSize.value,
           theme: theme.value,
-          encoding: encoding.value,
           colorScheme: colorScheme.value,
         }),
       );

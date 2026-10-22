@@ -13,6 +13,7 @@ const emit = defineEmits<{
 const path = ref("");
 const lines = ref<string[]>([]);
 const loading = ref(false);
+const confirming = ref(false);
 
 async function load() {
   loading.value = true;
@@ -27,7 +28,12 @@ async function load() {
   }
 }
 
-async function clear() {
+function askClear() {
+  confirming.value = true;
+}
+
+async function doClear() {
+  confirming.value = false;
   try {
     await clearAppLog();
   } catch {
@@ -43,6 +49,7 @@ function close() {
 watch(
   () => props.open,
   (open) => {
+    confirming.value = false;
     if (open) void load();
   },
 );
@@ -70,8 +77,19 @@ watch(
         </div>
         <div class="dialog-footer">
           <button class="btn" @click="load">刷新</button>
-          <button class="btn" @click="clear">清空</button>
+          <button class="btn" @click="askClear">清空</button>
           <button class="btn primary" @click="close">关闭</button>
+        </div>
+      </div>
+
+      <div v-if="confirming" class="confirm-overlay" @click.self="confirming = false">
+        <div class="confirm-box">
+          <div class="confirm-title">清空日志</div>
+          <div class="confirm-text">确定清空启动日志？清空后无法恢复。</div>
+          <div class="confirm-actions">
+            <button class="btn" @click="confirming = false">取消</button>
+            <button class="btn danger" @click="doClear">清空</button>
+          </div>
         </div>
       </div>
     </div>
@@ -201,6 +219,57 @@ watch(
   background: var(--accent);
   border-color: var(--accent);
   font-weight: 600;
+}
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirm-box {
+  width: 340px;
+  padding: 18px 20px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.confirm-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.confirm-text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.btn.danger {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  font-weight: 600;
+}
+
+.btn.danger:hover {
+  background: var(--danger-bright);
+  border-color: var(--danger-bright);
 }
 
 .btn.primary:hover {

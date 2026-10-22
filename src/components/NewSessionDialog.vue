@@ -159,7 +159,8 @@ watch(
       stopBits.value = 1;
       parity.value = "None";
       sessionName.value = "";
-      sessionEncoding.value = settingsStore.encoding;
+      // 默认 UTF-8：编码按会话/档案走，不继承上次的临时选择
+      sessionEncoding.value = "utf-8";
       sessionFontFamily.value = settingsStore.fontFamily;
       sessionFontSize.value = settingsStore.fontSize;
       sessionColorScheme.value = settingsStore.colorScheme;
