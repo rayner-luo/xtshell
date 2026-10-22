@@ -1,6 +1,6 @@
 # xtshell
 
-仿 PrivateShell 的 SSH / Telnet / Serial 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript，终端渲染使用 xterm.js。
+SSH / Telnet / Serial 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript，终端渲染使用 xterm.js。
 
 ## 功能
 

@@ -818,17 +818,17 @@ mod tests {
 
     #[test]
     fn strip_ansi_removes_csi_osc_and_keeps_text() {
-        let d = b"\x1b[?2004h\x1b[Klsblk\n\x1b[?2004l\nroot@ecs-0902:~# NAME   MAJ:MIN\nvda    254:0";
+        let d = b"\x1b[?2004h\x1b[Klsblk\n\x1b[?2004l\nroot@host:~# NAME   MAJ:MIN\nvda    254:0";
         assert_eq!(
             strip_ansi(d),
-            b"lsblk\n\nroot@ecs-0902:~# NAME   MAJ:MIN\nvda    254:0".to_vec()
+            b"lsblk\n\nroot@host:~# NAME   MAJ:MIN\nvda    254:0".to_vec()
         );
     }
 
     #[test]
     fn strip_ansi_removes_osc_title() {
-        let d = b"\x1b]0;rayner@debian: ~\x07root@ecs-0902:~# blkid\r\n";
-        assert_eq!(strip_ansi(d), b"root@ecs-0902:~# blkid\r\n".to_vec());
+        let d = b"\x1b]0;user@debian: ~\x07root@host:~# blkid\r\n";
+        assert_eq!(strip_ansi(d), b"root@host:~# blkid\r\n".to_vec());
     }
 
     #[test]

@@ -1,4 +1,11 @@
-# Logs
+# 依赖与构建产物
+node_modules
+dist
+dist-ssr
+src-tauri/target
+src-tauri/gen
+
+# 日志
 logs
 *.log
 npm-debug.log*
@@ -7,30 +14,28 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# 本地环境与编辑器
 *.local
-
-# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Rust / Tauri
-src-tauri/target
-
-# Generated
-src-tauri/gen
+*.tsbuildinfo
+.eslintcache
 
 # opencode 会话数据
 .zcode/
 
 # Windows 下载文件附带的 Zone.Identifier 备用数据流
 *:Zone.Identifier
+
+# 内部文档（仅本地保留，不随仓库发布）
+设计方案.md
+AGENTS.md
+docs/superpowers/
