@@ -57,7 +57,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+            upx-ucl
+
+      - name: 安装 UPX（Windows）
+        if: matrix.platform == 'windows-latest'
+        run: choco install upx --no-progress -y
 
       - name: 安装前端依赖
         run: pnpm install --frozen-lockfile
@@ -72,3 +77,22 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # 安装包里的二进制已在 beforeBundleCommand 阶段被 UPX 压缩；
+      # 这里再把 Windows 的独立 exe 作为便携版附加到同一个 Release。
+      - name: 附加 Windows 便携版（UPX）
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          $src = "src-tauri/target/release/xtshell.exe"
+          if (-not (Test-Path $src)) {
+            $src = (Get-ChildItem -Recurse -Filter xtshell.exe src-tauri/target | Select-Object -First 1).FullName
+          }
+          if (-not $src -or -not (Test-Path $src)) { Write-Error '找不到编译产物'; exit 1 }
+          $dst = "xtshell-$ver-win64-upx.exe"
+          Copy-Item $src $dst
+          Write-Output ("便携版大小: {0:N2} MB" -f ((Get-Item $dst).Length / 1MB))
+          gh release upload "v$ver" $dst --clobber
