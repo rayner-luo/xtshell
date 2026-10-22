@@ -222,6 +222,7 @@ pub async fn serve_mcp(
     );
     let router = axum::Router::new().nest_service("/mcp", service);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
+    crate::applog::info(&format!("MCP 服务已监听 http://127.0.0.1:{port}/mcp"));
     axum::serve(listener, router).await?;
     Ok(())
 }

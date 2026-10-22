@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 const props = defineProps<{
@@ -10,22 +10,25 @@ const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
 }>();
 
-const mcpConfig = JSON.stringify(
-  { xtshell: { type: "http", url: "http://127.0.0.1:46543/mcp" } },
-  null,
-  2
+const MCP_NAME = "xtshell";
+const MCP_TYPE = "http";
+const MCP_URL = "http://127.0.0.1:9567/mcp";
+
+/** 客户端配置（JSON），供「复制配置」写入 MCP 客户端配置文件 */
+const mcpConfig = computed(() =>
+  JSON.stringify({ [MCP_NAME]: { type: MCP_TYPE, url: MCP_URL } }, null, 2),
 );
 
-const copied = ref(false);
+const copied = ref<"" | "url" | "config">("");
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function copyConfig() {
+async function copy(text: string, kind: "url" | "config") {
   try {
-    await writeText(mcpConfig);
-    copied.value = true;
+    await writeText(text);
+    copied.value = kind;
     if (copiedTimer) clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => {
-      copied.value = false;
+      copied.value = "";
     }, 1500);
   } catch {
     /* ignore */
@@ -46,12 +49,26 @@ function close() {
           <button class="dialog-close" @click="close">✕</button>
         </div>
         <div class="dialog-body">
-          <pre class="config-block">{{ mcpConfig }}</pre>
-          <div class="hint-text">外部 agent 可通过此配置连接本地 MCP 服务</div>
+          <div class="field-row">
+            <span class="field-label">名称</span>
+            <span class="field-value">{{ MCP_NAME }}</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">类型</span>
+            <span class="field-value">{{ MCP_TYPE }}</span>
+          </div>
+          <div class="field-row">
+            <span class="field-label">URL</span>
+            <span class="field-value url">{{ MCP_URL }}</span>
+          </div>
+          <div class="hint-text">外部 agent 可通过此地址连接本地 MCP 服务</div>
         </div>
         <div class="dialog-footer">
-          <button class="btn primary" @click="copyConfig">
-            {{ copied ? "已复制✓" : "复制" }}
+          <button class="btn" @click="copy(MCP_URL, 'url')">
+            {{ copied === "url" ? "已复制✓" : "复制 URL" }}
+          </button>
+          <button class="btn primary" @click="copy(mcpConfig, 'config')">
+            {{ copied === "config" ? "已复制✓" : "复制配置" }}
           </button>
         </div>
       </div>
@@ -71,7 +88,7 @@ function close() {
 }
 
 .dialog {
-  width: 420px;
+  width: 460px;
   background: var(--bg-panel);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -109,21 +126,34 @@ function close() {
 }
 
 .dialog-body {
-  padding: 16px;
+  padding: 6px 16px 12px;
 }
 
-.config-block {
-  margin: 0;
-  padding: 10px 12px;
-  font-family: Consolas, "Courier New", monospace;
+.field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+.field-label {
+  flex: 0 0 52px;
   font-size: 12px;
-  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.field-value {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  user-select: text;
+}
+
+.field-value.url {
+  font-family: Consolas, "Courier New", monospace;
   color: var(--accent);
-  background: var(--bg-app);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  white-space: pre;
-  overflow-x: auto;
+  word-break: break-all;
 }
 
 .hint-text {
@@ -135,18 +165,33 @@ function close() {
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
 }
 
-.btn.primary {
-  padding: 6px 18px;
+.btn {
+  padding: 6px 16px;
   font-size: 12px;
-  color: var(--bg-app);
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  font-weight: 600;
   cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+}
+
+.btn.primary {
+  color: var(--text-on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.btn.primary:hover {
+  background: var(--accent-hover);
 }
 </style>

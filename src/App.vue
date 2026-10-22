@@ -17,6 +17,7 @@ import ZmodemPickDialog from "./components/ZmodemPickDialog.vue";
 import ZmodemConflictDialog from "./components/ZmodemConflictDialog.vue";
 import ConnectAuthDialog from "./components/ConnectAuthDialog.vue";
 import SshHostKeyDialog from "./components/SshHostKeyDialog.vue";
+import LogDialog from "./components/LogDialog.vue";
 import { useSftpStore } from "./stores/sftp";
 import { getTerminalActions } from "./lib/terminalBus";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -38,6 +39,7 @@ function onMenuSftp() {
 }
 const profilesStore = useProfilesStore();
 const showDialog = ref(false);
+const showLog = ref(false);
 const showEncoding = ref(false);
 const showSettings = ref(false);
 const showSessionSettings = ref(false);
@@ -141,6 +143,7 @@ onBeforeUnmount(() => {
       @toggle-log="sessionLog.toggleLogging"
       @exit="quitApp"
       @about="showAbout = true"
+      @app-log="showLog = true"
     />
     <Toolbar
       @new-session="newSession"
@@ -163,6 +166,7 @@ onBeforeUnmount(() => {
     <EncodingDialog v-model:open="showEncoding" />
     <McpDialog v-model:open="showMcp" />
     <AboutDialog v-model:open="showAbout" />
+    <LogDialog v-model:open="showLog" />
     <ZmodemDialog />
     <ZmodemPickDialog />
     <ZmodemConflictDialog />

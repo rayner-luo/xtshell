@@ -21,7 +21,8 @@ type MenuEvent =
   | "reconnect"
   | "toggle-log"
   | "exit"
-  | "about";
+  | "about"
+  | "app-log";
 
 interface MenuItem {
   label: string;
@@ -100,7 +101,13 @@ const menus = computed<Menu[]>(() => [
       { label: "MCP", event: "mcp-info", iconComponent: McpIcon, activeColor: "var(--accent-blue)" },
     ],
   },
-  { name: "帮助", items: [{ label: "关于", event: "about", iconComponent: AboutIcon, activeColor: "var(--icon-accent)" }] },
+  {
+    name: "帮助",
+    items: [
+      { label: "关于", event: "about", iconComponent: AboutIcon, activeColor: "var(--icon-accent)" },
+      { label: "日志", event: "app-log", iconComponent: LogIcon, activeColor: "var(--icon-accent)" },
+    ],
+  },
 ]);
 
 function iconStyle(item: MenuItem) {

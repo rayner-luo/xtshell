@@ -32,6 +32,28 @@ pub fn set_native_theme(dark: bool) {
     let _ = dark;
 }
 
+/// 应用日志（启动日志）：返回日志文件路径与最近若干行，**最新在最前**。
+#[derive(Debug, Serialize)]
+pub struct AppLogDto {
+    pub path: String,
+    pub lines: Vec<String>,
+}
+
+#[tauri::command]
+pub fn read_app_log(limit: Option<usize>) -> AppLogDto {
+    AppLogDto {
+        path: crate::applog::path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+        lines: crate::applog::tail(limit.unwrap_or(2000)),
+    }
+}
+
+#[tauri::command]
+pub fn clear_app_log() {
+    crate::applog::clear();
+}
+
 #[tauri::command]
 pub fn list_serial_ports() -> Result<Vec<SerialPortInfoDto>, ApiError> {
     let ports = tokio_serial::available_ports()

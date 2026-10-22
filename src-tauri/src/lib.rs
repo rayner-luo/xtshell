@@ -1,3 +1,4 @@
+mod applog;
 mod connector;
 mod commands;
 mod error;
@@ -34,9 +35,24 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .unwrap_or_else(|_| std::env::temp_dir().join("xtshell-fallback"));
+            // 启动日志先就位：后续初始化结果、MCP 绑定失败等才有地方落盘，
+            // 用户可在「日志」菜单直接看到（GUI 程序没有控制台）。
+            applog::init(&dir);
+            applog::info(&format!(
+                "xtshell {} 启动（{} {}）",
+                app.package_info().version,
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            ));
+            applog::info(&format!("数据目录: {}", dir.display()));
+
             let store = match profile::ProfileStore::open(&dir) {
-                Ok(store) => store,
+                Ok(store) => {
+                    applog::info("会话配置加载完成");
+                    store
+                }
                 Err(e) => {
+                    applog::error(&format!("会话配置加载失败: {e}（改用临时目录）"));
                     eprintln!("profile store init failed: {e}");
                     profile::ProfileStore::open(&std::env::temp_dir().join("xtshell-fallback"))
                         .expect("fallback profile store")
@@ -51,7 +67,8 @@ pub fn run() {
                 .clone();
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = mcp::serve_mcp(mgr2, profiles2, handle, 46543).await {
+                if let Err(e) = mcp::serve_mcp(mgr2, profiles2, handle, 9567).await {
+                    applog::error(&format!("MCP 服务启动失败: {e}"));
                     eprintln!("mcp server failed: {e}");
                 }
             });
@@ -69,6 +86,8 @@ pub fn run() {
             commands::list_serial_ports,
             commands::set_session_log,
             commands::set_native_theme,
+            commands::read_app_log,
+            commands::clear_app_log,
             commands::list_profiles,
             commands::save_profile,
             commands::update_profile_appearance,

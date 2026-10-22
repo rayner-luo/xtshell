@@ -102,6 +102,17 @@ export const listSerialPorts = () =>
 export const setSessionLog = (id: string, path: string | null) =>
   invoke<string | null>("set_session_log", { id, path });
 
+/** 应用日志（启动日志）：lines 已是「最新在最前」 */
+export interface AppLog {
+  path: string;
+  lines: string[];
+}
+
+export const readAppLog = (limit?: number) =>
+  invoke<AppLog>("read_app_log", { limit: limit ?? null });
+
+export const clearAppLog = () => invoke<void>("clear_app_log");
+
 export function onProfilesChanged(cb: () => void): Promise<UnlistenFn> {
   return listen("profiles-changed", () => cb());
 }
