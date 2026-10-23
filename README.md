@@ -2,6 +2,8 @@
 
 SSH / Telnet / Serial 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript，终端渲染使用 xterm.js。
 
+![xtshell 主界面](docs/screenshots/main.png)
+
 ## 功能
 
 - **多协议**：SSH（密码 / 私钥 + 口令，兼容老式设备的旧 KEX/加密算法）、Telnet（IAC 协商过滤 + 自动登录）、Serial（串口参数可配置）
