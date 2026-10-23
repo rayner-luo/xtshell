@@ -36,6 +36,18 @@ ldd --version | head -1                 # 需 ≥ 2.35
 ls /usr/lib/*/libwebkit2gtk-4.1.so.0    # 需存在
 ```
 
+## 界面预览
+
+**支持 SSH / Telnet / Serial** —— 新建会话分「常规 / 终端 / 转发」三页，
+SSH 额外支持本地端口转发（本地监听 → 经会话转发到远端）。
+
+![新建会话](docs/screenshots/new-session.png)
+
+**原生支持 MCP** —— 内置本地 MCP 服务，Claude Code / Cursor / Codex 等 AI Agent
+可直接创建并操作会话（创建、输入、读取输出）。
+
+![MCP 服务](docs/screenshots/mcp.png)
+
 ## 开发
 
 需要 Node 22+、pnpm、Rust stable（Windows 上还需 MSVC 工具链与 WebView2）。
