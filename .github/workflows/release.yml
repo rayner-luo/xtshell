@@ -28,9 +28,14 @@ jobs:
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             args: "--no-bundle"
-          - platform: ubuntu-22.04 # deb / AppImage
+          # Linux x86_64：deb + rpm（不发 AppImage）
+          - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            args: ""
+            args: "--bundles deb,rpm"
+          # Linux aarch64：面向信创机器（鲲鹏/飞腾等 ARM64）
+          - platform: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            args: "--target aarch64-unknown-linux-gnu --bundles deb,rpm"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -54,7 +59,7 @@ jobs:
           workspaces: src-tauri
 
       - name: 安装 Linux 构建依赖（Tauri v2）
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
@@ -81,6 +86,17 @@ jobs:
 
       # 安装包里的二进制已在 beforeBundleCommand 阶段被 UPX 压缩；
       # 这里再把 Windows 的独立 exe 作为便携版附加到同一个 Release。
+      - name: 清理旧的 AppImage 资产（已改为只发 deb/rpm）
+        if: startsWith(matrix.platform, 'ubuntu-')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          gh release view "v$VER" --json assets -q '.assets[].name' 2>/dev/null | grep -i 'AppImage$' | while read -r n; do
+            echo "删除 AppImage: $n"
+            gh release delete-asset "v$VER" "$n" -y 2>/dev/null || true
+          done
+
       - name: 移除 macOS 的 updater 产物
         if: matrix.platform == 'macos-latest'
         env:
