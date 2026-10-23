@@ -24,10 +24,11 @@ jobs:
           - platform: macos-13 # Intel (x86_64)：仅 dmg
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin --bundles dmg
-          # Windows：不打 NSIS/MSI，只产出 UPX 便携 exe（见文末步骤）
+          # Windows：tauri-action 要求至少产出一个 bundle，这里只打 NSIS；
+          # 安装包随后由「附加便携版」步骤删除，最终只留 UPX 便携 exe
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            args: "--no-bundle"
+            args: "--bundles nsis"
           # Linux x86_64：deb + rpm（不发 AppImage）
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -122,7 +123,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # --no-bundle 不会触发 beforeBundleCommand，这里显式压一次（已压缩则自动跳过）
+          # 保险起见再压一次（打包阶段已压过则自动跳过）
           node scripts/upx-binary.mjs
           $ver = (Get-Content package.json | ConvertFrom-Json).version
           $src = "src-tauri/target/release/xtshell.exe"
@@ -135,7 +136,7 @@ jobs:
           Write-Output ("便携版大小: {0:N2} MB" -f ((Get-Item $dst).Length / 1MB))
           gh release upload "v$ver" $dst --clobber
 
-          # 清掉历史遗留的安装包资产（本项目只发便携版）
+          # 清掉安装包资产（本项目只发便携版）
           $assets = (gh release view "v$ver" --json assets -q '.assets[].name' 2>$null) -split "`n"
           foreach ($n in $assets) {
             if ($n -match 'setup\.exe$' -or $n -match '\.msi$') {
