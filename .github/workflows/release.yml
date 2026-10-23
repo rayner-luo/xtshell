@@ -18,15 +18,16 @@ jobs:
       matrix:
         include:
           # macOS：Apple Silicon 与 Intel 各构建一次（macOS 无法在 Linux/Windows 上交叉编译）
-          - platform: macos-latest # Apple Silicon (aarch64)
+          - platform: macos-latest # Apple Silicon (aarch64)：仅 dmg
             target: aarch64-apple-darwin
-            args: --target aarch64-apple-darwin
-          - platform: macos-13 # Intel (x86_64)
+            args: --target aarch64-apple-darwin --bundles dmg
+          - platform: macos-13 # Intel (x86_64)：仅 dmg
             target: x86_64-apple-darwin
-            args: --target x86_64-apple-darwin
-          - platform: windows-latest # NSIS 安装包 + MSI
+            args: --target x86_64-apple-darwin --bundles dmg
+          # Windows：不打 NSIS/MSI，只产出 UPX 便携 exe（见文末步骤）
+          - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            args: ""
+            args: "--no-bundle"
           - platform: ubuntu-22.04 # deb / AppImage
             target: x86_64-unknown-linux-gnu
             args: ""
@@ -80,12 +81,25 @@ jobs:
 
       # 安装包里的二进制已在 beforeBundleCommand 阶段被 UPX 压缩；
       # 这里再把 Windows 的独立 exe 作为便携版附加到同一个 Release。
+      - name: 移除 macOS 的 updater 产物
+        if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          gh release view "v$VER" --json assets -q '.assets[].name' 2>/dev/null | grep 'app.tar.gz$' | while read -r n; do
+            echo "删除 updater 产物: $n"
+            gh release delete-asset "v$VER" "$n" -y 2>/dev/null || true
+          done
+
       - name: 附加 Windows 便携版（UPX）
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # --no-bundle 不会触发 beforeBundleCommand，这里显式压一次（已压缩则自动跳过）
+          node scripts/upx-binary.mjs
           $ver = (Get-Content package.json | ConvertFrom-Json).version
           $src = "src-tauri/target/release/xtshell.exe"
           if (-not (Test-Path $src)) {
@@ -96,3 +110,12 @@ jobs:
           Copy-Item $src $dst
           Write-Output ("便携版大小: {0:N2} MB" -f ((Get-Item $dst).Length / 1MB))
           gh release upload "v$ver" $dst --clobber
+
+          # 清掉历史遗留的安装包资产（本项目只发便携版）
+          $assets = (gh release view "v$ver" --json assets -q '.assets[].name' 2>$null) -split "`n"
+          foreach ($n in $assets) {
+            if ($n -match 'setup\.exe$' -or $n -match '\.msi$') {
+              Write-Output "删除多余资产: $n"
+              gh release delete-asset "v$ver" $n -y 2>$null
+            }
+          }
