@@ -12,6 +12,28 @@ SSH / Telnet / Serial 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript�
 - **终端体验**：GBK/UTF-8 等编码切换、全局与单会话字体/配色、会话日志（自动剥离 ANSI）、复制粘贴
 - **MCP**：本地 `http://127.0.0.1:9567/mcp`，供外部 agent 创建/操作会话（菜单「工具 → MCP」查看配置）
 
+## 系统要求与兼容性
+
+| 平台 | 下载 | 要求 |
+|---|---|---|
+| Windows 10 / 11 | `xtshell-<ver>-win64-upx.exe`（免安装） | 需 WebView2 运行时（Win11 自带，Win10 一般已随 Edge 安装） |
+| macOS 12+ | `xtshell_<ver>_aarch64.dmg` / `xtshell_<ver>_x64.dmg` | Apple Silicon 与 Intel 各一个包 |
+| Linux x86_64 | `*.deb` / `*.rpm` | glibc ≥ 2.35、WebKitGTK 4.1 |
+| Linux arm64（信创） | `*.deb` / `*.rpm` | 同上；面向鲲鹏 / 飞腾等 ARM64 机器 |
+
+Linux 侧说明：Tauri 2 使用 WebKitGTK **4.1**（libsoup3），因此要求 glibc ≥ 2.35，对应
+Ubuntu 22.04+ / Debian 12+ / Fedora 36+ / openEuler 24.03+，以及基于这些版本的新一代国产系统
+（麒麟 V11、统信 UOS 25 等）。
+
+**不支持**：麒麟 V10、统信 UOS 20 及更早版本（glibc 2.28，且只有 WebKitGTK 4.0）。
+
+装前自检：
+
+```bash
+ldd --version | head -1                 # 需 ≥ 2.35
+ls /usr/lib/*/libwebkit2gtk-4.1.so.0    # 需存在
+```
+
 ## 开发
 
 需要 Node 22+、pnpm、Rust stable（Windows 上还需 MSVC 工具链与 WebView2）。

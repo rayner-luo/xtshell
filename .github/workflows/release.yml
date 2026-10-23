@@ -79,7 +79,15 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "xtshell v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: |
+            | 平台 | 下载 | 要求 |
+            | --- | --- | --- |
+            | Windows 10/11 | `xtshell-<ver>-win64-upx.exe`（免安装） | 需 WebView2 运行时 |
+            | macOS 12+ | `*.dmg` | Apple Silicon / Intel 两个包 |
+            | Linux x86_64 | `*.deb` / `*.rpm` | glibc ≥ 2.35、WebKitGTK 4.1 |
+            | Linux arm64（信创） | `*.deb` / `*.rpm` | 同上，面向鲲鹏/飞腾等 ARM64 |
+
+            不兼容：麒麟 V10、统信 UOS 20 及更早版本（glibc 2.28、仅 WebKitGTK 4.0）。
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
