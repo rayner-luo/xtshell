@@ -24,9 +24,16 @@ export interface ProfileSessionView {
   encoding?: string;
   terminal_appearance?: TerminalAppearance | null;
   forwards?: PortForward[];
+  socks5?: Socks5Config | null;
   created_at: string;
   has_password: boolean;
   has_passphrase: boolean;
+}
+
+/** SSH 动态代理（SOCKS5）：仅监听 127.0.0.1，无认证 */
+export interface Socks5Config {
+  enabled: boolean;
+  local_port: number;
 }
 
 /** SSH 本地端口转发：本地监听 → 经会话转发到远端 */
@@ -69,6 +76,7 @@ export interface SaveProfileRequest {
   encoding?: string;
   terminal_appearance?: TerminalAppearance | null;
   forwards?: PortForward[];
+  socks5?: Socks5Config | null;
   parity?: string;
 }
 

@@ -226,6 +226,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         terminal_appearance: p.terminal_appearance,
         encoding: p.encoding,
         forwards: p.forwards ?? [],
+        socks5: p.socks5 ?? null,
       });
       await refresh();
     } catch (e) {
@@ -255,6 +256,7 @@ export const useProfilesStore = defineStore("profiles", () => {
         terminal_appearance: p.terminal_appearance ?? undefined,
         encoding,
         forwards: p.forwards ?? [],
+        socks5: p.socks5 ?? null,
       });
       await refresh();
     } catch (e) {

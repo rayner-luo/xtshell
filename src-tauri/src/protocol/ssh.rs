@@ -253,6 +253,11 @@ impl SshStream {
         self.session.clone()
     }
 
+    /// 启动 SOCKS5 动态代理（仅 127.0.0.1，无认证）：会话关闭后自动停止。
+    pub fn start_socks5(&self, cfg: crate::profile::Socks5Config) {
+        crate::protocol::socks5::start(self.session.clone(), cfg);
+    }
+
     /// 启动 SSH 本地端口转发：为每条转发在本地监听，收到连接后经既有 SSH
     /// 连接开 direct-tcpip 通道，再双向转发字节。绑定/开通道失败写入应用日志。
     pub fn start_forwards(&self, forwards: Vec<crate::profile::PortForward>) {

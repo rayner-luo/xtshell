@@ -30,6 +30,26 @@ pub struct TerminalAppearance {
     pub color_scheme: Option<String>,
 }
 
+/// SSH 动态代理（SOCKS5）：会话建立后在 127.0.0.1:local_port 监听，
+/// 等价 `ssh -D`。只绑回环地址、不做认证，仅支持 CONNECT。
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default, rename_all = "snake_case")]
+pub struct Socks5Config {
+    pub enabled: bool,
+    pub local_port: u16,
+}
+
+impl Socks5Config {
+    /// 启用且端口有效时返回监听地址
+    pub fn listen_addr(&self) -> Option<String> {
+        if self.enabled && self.local_port != 0 {
+            Some(format!("127.0.0.1:{}", self.local_port))
+        } else {
+            None
+        }
+    }
+}
+
 /// SSH 本地端口转发：本地监听 local_addr:local_port，经既有 SSH 连接
 /// 转发到远端 remote_addr:remote_port（direct-tcpip 通道）。
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -108,6 +128,9 @@ pub struct ProfileSession {
     /// SSH 本地端口转发列表（非 SSH 协议保存时清空）
     #[serde(default)]
     pub forwards: Vec<PortForward>,
+    /// SSH 动态代理（SOCKS5）
+    #[serde(default)]
+    pub socks5: Option<Socks5Config>,
     pub created_at: String,
 }
 
@@ -141,6 +164,8 @@ pub struct ProfileSessionView {
     pub terminal_appearance: Option<TerminalAppearance>,
     #[serde(default)]
     pub forwards: Vec<PortForward>,
+    #[serde(default)]
+    pub socks5: Option<Socks5Config>,
     pub created_at: String,
     pub has_password: bool,
     pub has_passphrase: bool,
@@ -191,6 +216,8 @@ pub struct SaveProfileRequest {
     pub terminal_appearance: Option<TerminalAppearance>,
     #[serde(default)]
     pub forwards: Vec<PortForward>,
+    #[serde(default)]
+    pub socks5: Option<Socks5Config>,
 }
 
 pub struct ProfileStore {
@@ -262,6 +289,7 @@ impl ProfileStore {
             encoding: s.encoding.clone(),
             terminal_appearance: s.terminal_appearance.clone(),
             forwards: s.forwards.clone(),
+            socks5: s.socks5.clone(),
             created_at: s.created_at.clone(),
                     has_password: s.password_enc.is_some(),
                     has_passphrase: s.private_key_passphrase_enc.is_some(),
@@ -432,6 +460,12 @@ impl ProfileStore {
         } else {
             Vec::new()
         };
+        // SOCKS5 同样只对 SSH 有意义；未启用或端口无效就不落库
+        let socks5 = if req.protocol == "ssh" {
+            req.socks5.filter(|c| c.listen_addr().is_some())
+        } else {
+            None
+        };
 
         let new_entry = ProfileSession {
             id: id.clone(),
@@ -454,6 +488,7 @@ impl ProfileStore {
             encoding: req.encoding,
             terminal_appearance: req.terminal_appearance,
             forwards,
+            socks5,
             created_at,
         };
 
@@ -535,6 +570,7 @@ impl ProfileStore {
             parity: p.parity.clone(),
             profile_id: Some(p.id.clone()),
             forwards: p.forwards.clone(),
+            socks5: p.socks5.clone(),
         })
     }
 

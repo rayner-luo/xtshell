@@ -51,8 +51,10 @@ const sessionFontFamily = ref(settingsStore.fontFamily);
 const sessionFontSize = ref(settingsStore.fontSize);
 const sessionColorScheme = ref<TerminalColorScheme>(settingsStore.colorScheme);
 
-// 转发标签页：SSH 本地端口转发
+// 转发标签页：SSH 本地端口转发 + SOCKS5 动态代理
 const forwards = ref<PortForward[]>([]);
+const socks5Enabled = ref(false);
+const socks5Port = ref(1080);
 
 const isEdit = computed(() => !!props.editProfile);
 const isSsh = computed(() => protocol.value === "ssh");
@@ -143,6 +145,8 @@ watch(
       sessionFontSize.value = appearance?.font_size ?? settingsStore.fontSize;
       sessionColorScheme.value = (appearance?.color_scheme as TerminalColorScheme) ?? settingsStore.colorScheme;
       forwards.value = (p.forwards ?? []).map((f) => ({ ...f }));
+      socks5Enabled.value = p.socks5?.enabled ?? false;
+      socks5Port.value = p.socks5?.local_port ?? 1080;
       rememberPassword.value = p.has_password || p.has_passphrase;
     } else {
       protocol.value = "ssh";
@@ -165,6 +169,8 @@ watch(
       sessionFontSize.value = settingsStore.fontSize;
       sessionColorScheme.value = settingsStore.colorScheme;
       forwards.value = [];
+      socks5Enabled.value = false;
+      socks5Port.value = 1080;
       rememberPassword.value = false;
       createFolderId.value = profilesStore.pendingNewFolderId;
       profilesStore.pendingNewFolderId = null;
@@ -240,6 +246,11 @@ async function submit() {
     };
     const forwardList: PortForward[] =
       protocol.value === "ssh" ? forwards.value.filter((f) => f.local_port > 0) : [];
+    // SOCKS5：仅 SSH、仅回环，端口有效才下发
+    const socks5 =
+      protocol.value === "ssh" && socks5Enabled.value && socks5Port.value > 0
+        ? { enabled: true, local_port: socks5Port.value }
+        : undefined;
 
     if (props.editProfile) {
       await saveProfile({
@@ -263,6 +274,7 @@ async function submit() {
         encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
         terminal_appearance: appearance,
         forwards: forwardList,
+        socks5,
       });
       close();
       return;
@@ -270,6 +282,7 @@ async function submit() {
 
     // 新建：先建会话并立即关闭对话框（tab 即时可见），profile 后台保存
     config.forwards = forwardList;
+    config.socks5 = socks5;
     const sessionId = await store.create(config);
     if (sessionEncoding.value !== "utf-8") {
       store.setEncoding(sessionId, sessionEncoding.value);
@@ -295,6 +308,7 @@ async function submit() {
       encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
       terminal_appearance: appearance,
       forwards: forwardList,
+      socks5,
     })
       .then((profileId) => profilesStore.linkSession(sessionId, profileId))
       .catch(() => {
@@ -506,8 +520,32 @@ onBeforeUnmount(() => {
             <div class="hint-line">以上设置仅对本会话生效，未修改时沿用全局设置。</div>
           </template>
 
-          <!-- 转发：SSH 本地端口转发 -->
+          <!-- 转发：SOCKS5 动态代理 + SSH 本地端口转发 -->
           <template v-else>
+            <div class="socks5-block">
+              <label class="socks5-head">
+                <input v-model="socks5Enabled" type="checkbox" />
+                <span class="socks5-title">SOCKS5 代理</span>
+                <span class="socks5-sub">等价 ssh -D，仅监听 127.0.0.1</span>
+              </label>
+              <div v-if="socks5Enabled" class="socks5-row">
+                <span class="socks5-addr">127.0.0.1</span>
+                <span class="socks5-colon">:</span>
+                <input
+                  v-model.number="socks5Port"
+                  class="form-input cell socks5-port"
+                  type="number"
+                  :min="1"
+                  :max="65535"
+                />
+              </div>
+              <div class="hint-line">
+                连接后自动开始监听，浏览器或工具的 SOCKS5 代理设为
+                127.0.0.1:{{ socks5Port }} 即可经本会话访问内网；会话关闭时代理随之停止。
+              </div>
+            </div>
+
+            <div class="section-divider"></div>
             <div class="forward-head">
               <span class="forward-title">本地端口转发</span>
               <button class="btn small" @click="addForward">+ 添加</button>
@@ -642,6 +680,8 @@ onBeforeUnmount(() => {
 .dialog-body {
   padding: 16px;
   overflow-y: auto;
+  /* 竖向滚动条出现时会挤掉宽度，禁用横向滚动避免出现多余滚动条 */
+  overflow-x: hidden;
 }
 
 .segment {
@@ -757,6 +797,55 @@ onBeforeUnmount(() => {
   font-size: 11px;
   line-height: 1.6;
   color: var(--text-faint);
+}
+
+.socks5-block {
+  margin-bottom: 4px;
+}
+
+.socks5-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.socks5-head input {
+  accent-color: var(--accent);
+}
+
+.socks5-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.socks5-sub {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.socks5-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 0 22px;
+}
+
+.socks5-addr {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.socks5-colon {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.socks5-port {
+  flex: none;
+  width: 90px;
 }
 
 .forward-head {

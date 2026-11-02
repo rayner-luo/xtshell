@@ -1,4 +1,4 @@
-import type { PortForward } from "./profile";
+import type { PortForward, Socks5Config } from "./profile";
 
 export type Protocol = "ssh" | "telnet" | "serial";
 export type SessionState = "connecting" | "connected" | "closed";
@@ -35,4 +35,6 @@ export interface SessionConfig {
   parity?: string;
   /** SSH 本地端口转发（仅 ssh 生效） */
   forwards?: PortForward[];
+  /** SSH SOCKS5 动态代理（仅 ssh 生效） */
+  socks5?: Socks5Config | null;
 }

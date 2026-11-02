@@ -19,5 +19,6 @@ pub trait TerminalStream: Send {
 }
 
 pub mod serial;
+pub mod socks5;
 pub mod ssh;
 pub mod telnet;

@@ -56,6 +56,10 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
                     .register_handle(&id, slot);
                 // 本地端口转发（仅 SSH）：连接成功后启动本地监听
                 stream.start_forwards(cfg.forwards.clone());
+                // SOCKS5 动态代理（仅 SSH，仅回环监听）
+                if let Some(socks5) = cfg.socks5.clone() {
+                    stream.start_socks5(socks5);
+                }
                 Ok(Box::new(stream))
             }
             Err(e) => Err(e),

@@ -33,6 +33,9 @@ pub struct SessionConfig {
     /// SSH 本地端口转发列表（连接成功后启动监听）
     #[serde(default)]
     pub forwards: Vec<crate::profile::PortForward>,
+    /// SSH 动态代理（SOCKS5，连接成功后启动监听）
+    #[serde(default)]
+    pub socks5: Option<crate::profile::Socks5Config>,
 }
 
 impl SessionConfig {
