@@ -538,8 +538,15 @@ impl SessionManager {
 
     pub async fn resize(&mut self, id: &str, cols: u32, rows: u32) -> AppResult<()> {
         let s = self.get_mut(id)?;
-        if let Some(stream) = s.stream.as_mut() {
-            stream.resize(cols, rows).await?;
+        // 会话尚未建立（stream 为空）时必须报错：前端依赖这个返回判断行列数
+        // 是否真的下发成功，否则会把「没生效」当成成功而停止重试。
+        let stream = s
+            .stream
+            .as_mut()
+            .ok_or_else(|| AppError::Connection("not connected".into()))?;
+        if let Err(e) = stream.resize(cols, rows).await {
+            crate::applog::error(&format!("调整终端尺寸 {cols}x{rows} 失败：{e}"));
+            return Err(e);
         }
         Ok(())
     }
