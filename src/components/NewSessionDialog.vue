@@ -526,23 +526,17 @@ onBeforeUnmount(() => {
               <label class="socks5-head">
                 <input v-model="socks5Enabled" type="checkbox" />
                 <span class="socks5-title">SOCKS5 代理</span>
-                <span class="socks5-sub">等价 ssh -D，仅监听 127.0.0.1</span>
               </label>
-              <div v-if="socks5Enabled" class="socks5-row">
-                <span class="socks5-addr">127.0.0.1</span>
-                <span class="socks5-colon">:</span>
-                <input
-                  v-model.number="socks5Port"
-                  class="form-input cell socks5-port"
-                  type="number"
-                  :min="1"
-                  :max="65535"
-                />
-              </div>
-              <div class="hint-line">
-                连接后自动开始监听，浏览器或工具的 SOCKS5 代理设为
-                127.0.0.1:{{ socks5Port }} 即可经本会话访问内网；会话关闭时代理随之停止。
-              </div>
+              <span class="socks5-addr" :class="{ dim: !socks5Enabled }">127.0.0.1</span>
+              <span class="socks5-colon" :class="{ dim: !socks5Enabled }">:</span>
+              <input
+                v-model.number="socks5Port"
+                class="form-input cell socks5-port"
+                type="number"
+                :min="1"
+                :max="65535"
+                :disabled="!socks5Enabled"
+              />
             </div>
 
             <div class="section-divider"></div>
@@ -800,13 +794,17 @@ onBeforeUnmount(() => {
 }
 
 .socks5-block {
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
 }
 
 .socks5-head {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-right: 10px;
   cursor: pointer;
 }
 
@@ -820,16 +818,8 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
-.socks5-sub {
-  font-size: 11px;
-  color: var(--text-faint);
-}
-
-.socks5-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 10px 0 0 22px;
+.socks5-block .dim {
+  opacity: 0.45;
 }
 
 .socks5-addr {
@@ -843,9 +833,14 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-.socks5-port {
+.socks5-block input.socks5-port {
   flex: none;
-  width: 90px;
+  width: 68px;
+  padding: 3px 6px;
+}
+
+.socks5-block input.socks5-port:disabled {
+  opacity: 0.55;
 }
 
 .forward-head {
