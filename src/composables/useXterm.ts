@@ -109,6 +109,10 @@ export function useXterm(
   let onSelectionChange: { dispose: () => void } | null = null;
   let onMouseDown: ((e: MouseEvent) => void) | null = null;
   let disposed = false;
+  let resizeObserver: ResizeObserver | null = null;
+  let sizeSyncTimer: number | null = null;
+  let sizeSyncDeadline: number | null = null;
+  let sizeSynced = false;
 
   let decoder = new TextDecoder(sessionStore.encodingOf(sessionId));
   function applyEncoding(enc: Encoding) {
@@ -125,6 +129,42 @@ export function useXterm(
     } catch {
       /* container hidden or zero-sized */
     }
+  }
+
+  /** 把终端真实行列数同步给远端 PTY。新会话的 PTY 初始是 80x24，
+
+   * 而首次 resize 往往在连接建立前就发了（会被后端拒绝），所以必须重试，
+   * 否则 vim/nano 等全屏程序只画 24 行 —— 表现为「只显示半屏」。 */
+  async function syncSize() {
+    if (sizeSynced || disposed) return;
+    // 容器不可见时 fit 会得到退化尺寸，跳过，等可见后再同步
+    if (term.cols <= 1 || term.rows <= 1) return;
+    try {
+      await resizeSession(sessionId, term.cols, term.rows);
+      sizeSynced = true;
+      stopSizeSync();
+    } catch {
+      /* 会话尚未建立，等下一次重试 */
+    }
+  }
+
+  function stopSizeSync() {
+    if (sizeSyncTimer !== null) {
+      window.clearInterval(sizeSyncTimer);
+      sizeSyncTimer = null;
+    }
+    if (sizeSyncDeadline !== null) {
+      window.clearTimeout(sizeSyncDeadline);
+      sizeSyncDeadline = null;
+    }
+  }
+
+  function startSizeSync() {
+    if (sizeSynced || sizeSyncTimer !== null) return;
+    void syncSize();
+    sizeSyncTimer = window.setInterval(() => void syncSize(), 400);
+    // 兜底：最多重试 20 秒（连接很慢的服务器也不至于一直空转）
+    sizeSyncDeadline = window.setTimeout(stopSizeSync, 20000);
   }
 
   async function replayBuffer() {
@@ -144,7 +184,20 @@ export function useXterm(
     term.open(container.value);
     fit();
     term.focus();
-    resizeSession(sessionId, term.cols, term.rows).catch(() => {});
+    startSizeSync();
+
+    // 容器尺寸变化（切标签、折叠侧边栏、最大化、弹窗关闭）时重新 fit，
+    // fit 触发 term.onResize，从而把新尺寸同步给远端。
+    if (typeof ResizeObserver !== "undefined") {
+      let rafId = 0;
+      resizeObserver = new ResizeObserver(() => {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          if (!disposed) fit();
+        });
+      });
+      resizeObserver.observe(container.value);
+    }
 
     term.onData((data) => {
       void sendInput(sessionId, data).catch(() => {});
@@ -199,6 +252,8 @@ export function useXterm(
     unlistenOutput = await onSessionOutput(sessionId, (data) => {
       if (disposed) return;
       term.write(decoder.decode(data, { stream: true }));
+      // 有输出说明会话已就绪，补发真实尺寸（含重连后的新 PTY）
+      if (!sizeSynced) void syncSize();
     });
     if (disposed) {
       unlistenOutput();
@@ -208,6 +263,8 @@ export function useXterm(
 
     unlistenClosed = await onSessionClosed(sessionId, () => {
       if (disposed) return;
+      // 重连会新建 PTY（又是 80x24），下次输出时重新同步尺寸
+      sizeSynced = false;
       term.write("\r\n\x1b[90m[连接已断开]\x1b[0m\r\n");
       onClosed();
     });
@@ -329,6 +386,9 @@ export function useXterm(
     if (disposed) return;
     disposed = true;
     window.removeEventListener("resize", handleWindowResize);
+    stopSizeSync();
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     unlistenOutput?.();
     unlistenClosed?.();
     unlistenError?.();
