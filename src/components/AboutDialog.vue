@@ -46,7 +46,7 @@ function close() {
         <div class="dialog-body">
           <div class="about-row">
             <span class="about-label">版本</span>
-            <span class="about-value">{{ version || "—" }}</span>
+            <span class="about-value">{{ version ? `v${version}` : "—" }}</span>
           </div>
           <div class="about-row">
             <span class="about-label">作者</span>
