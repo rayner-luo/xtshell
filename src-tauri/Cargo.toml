@@ -29,6 +29,8 @@ zmodem2 = "0.7"
 russh = { version = "0.61", features = ["des"] }
 russh-sftp = "2"
 tokio-serial = "5"
+# 本地 Shell：跨平台伪终端（Windows ConPTY / Unix PTY）
+portable-pty = "0.9"
 rmcp = { version = "3", features = ["server", "macros", "transport-streamable-http-server"] }
 axum = "0.8"
 uuid = { version = "1", features = ["v4", "serde"] }

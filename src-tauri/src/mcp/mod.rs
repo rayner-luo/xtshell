@@ -34,6 +34,10 @@ pub struct CreateSessionParams {
     pub data_bits: Option<u8>,
     pub stop_bits: Option<u8>,
     pub parity: Option<String>,
+    /// 本地 Shell（protocol=local）：可执行文件路径，留空使用系统默认
+    pub shell: Option<String>,
+    /// 本地 Shell 启动参数（protocol=local 且 shell 非空时生效）
+    pub shell_args: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -68,7 +72,7 @@ impl McpServer {
         Self { tool_router: Self::tool_router(), mgr, profiles, app }
     }
 
-    #[tool(description = "Create a new SSH/Telnet/Serial session. Returns JSON {session_id}. protocol: ssh|telnet|serial")]
+    #[tool(description = "Create a new SSH/Telnet/Serial/Local session. Returns JSON {session_id}. protocol: ssh|telnet|serial|local (local runs a local shell in a pty; optional shell: executable path, shell_args: arguments string, default is the system shell)")]
     async fn create_session(
         &self,
         Parameters(p): Parameters<CreateSessionParams>,
@@ -86,6 +90,8 @@ impl McpServer {
             data_bits: p.data_bits,
             stop_bits: p.stop_bits,
             parity: p.parity,
+            shell: p.shell,
+            shell_args: p.shell_args,
             // MCP 手工建会话：不关联档案（无 UI 重输流程）
             profile_id: None,
             forwards: Vec::new(),
@@ -127,7 +133,7 @@ impl McpServer {
         Ok(tool_text(serde_json::to_string(&v).unwrap_or_else(|_| "[]".into())))
     }
 
-    #[tool(description = "List saved session profiles as JSON {folders:[{id,name,parent}],sessions:[{id,name,protocol,host,port,username,auth_mode,has_password,has_passphrase,folder,encoding}]}. Only has_password booleans, never credentials. Use connect_profile to launch one.")]
+    #[tool(description = "List saved session profiles as JSON {folders:[{id,name,parent}],sessions:[{id,name,protocol,host,port,username,auth_mode,has_password,has_passphrase,folder,encoding,shell,shell_args}]}. Only has_password booleans, never credentials. Use connect_profile to launch one.")]
     async fn list_profiles(&self) -> Result<CallToolResult, ErrorData> {
         let tree = self.profiles.lock().await.tree();
         Ok(tool_text(serde_json::to_string(&tree).unwrap_or_else(|_| "{}".into())))

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::AppError;
-use crate::protocol::{serial, ssh, telnet, ClosedSignal, OutputSink, TerminalStream};
+use crate::protocol::{local, serial, ssh, telnet, ClosedSignal, OutputSink, TerminalStream};
 use crate::session::manager::{SessionConfig, SessionId, SharedManager};
 use crate::zmodem::{ZmodemRegistry, ZmodemState};
 
@@ -80,6 +80,15 @@ pub async fn connect_session(mgr: SharedManager, id: SessionId, cfg: SessionConf
             cfg.data_bits,
             cfg.stop_bits,
             cfg.parity.as_deref(),
+            sink,
+            closed,
+        )
+        .map(|s| Box::new(s) as Box<dyn TerminalStream>),
+        "local" => local::LocalPtyStream::open(
+            cfg.shell.as_deref(),
+            cfg.shell_args.as_deref(),
+            80,
+            24,
             sink,
             closed,
         )

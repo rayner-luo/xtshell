@@ -5,6 +5,7 @@ import { useProfilesStore } from "../stores/profiles";
 import { useSettingsStore, fontOptions, type TerminalColorScheme } from "../stores/settings";
 import { encodingOptions, type Encoding } from "../types/session";
 import type { TerminalAppearance } from "../types/profile";
+import { normalizeShellPath, pickShellPath } from "../lib/shellPicker";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>();
@@ -17,6 +18,10 @@ const fontFamily = ref(settingsStore.fontFamily);
 const fontSize = ref(settingsStore.fontSize);
 const encoding = ref<string>(sessionStore.encodingOf(sessionStore.activeId ?? ""));
 const colorScheme = ref<string>(settingsStore.colorScheme);
+// 本地 Shell：新建 Local 连接时使用；留空=系统默认（Windows cmd.exe / Unix $SHELL）
+const localShell = ref(settingsStore.localShell);
+const localShellArgs = ref(settingsStore.localShellArgs);
+const localShellConfigured = computed(() => normalizeShellPath(localShell.value) !== "");
 
 const activeProfileId = computed(() => {
   const sessionId = sessionStore.activeId;
@@ -53,8 +58,24 @@ watch(
       encoding: sessionStore.encodingOf(sessionStore.activeId ?? ""),
       colorScheme: settingsStore.colorScheme,
     });
+    localShell.value = settingsStore.localShell;
+    localShellArgs.value = settingsStore.localShellArgs;
   },
 );
+
+async function browseLocalShell() {
+  try {
+    const picked = await pickShellPath(localShell.value);
+    if (picked) localShell.value = picked;
+  } catch {
+    /* 取消选择或系统对话框不可用：保持原值 */
+  }
+}
+
+function clearLocalShell() {
+  localShell.value = "";
+  localShellArgs.value = "";
+}
 
 async function save() {
   settingsStore.fontFamily = fontFamily.value;
@@ -63,11 +84,18 @@ async function save() {
     settingsStore.encoding = encoding.value as Encoding;
   }
   settingsStore.colorScheme = colorScheme.value as TerminalColorScheme;
+  const shellPath = normalizeShellPath(localShell.value);
+  settingsStore.localShell = shellPath;
+  settingsStore.localShellArgs = shellPath ? localShellArgs.value.trim() : "";
   if (sessionStore.activeId) {
     sessionStore.setEncoding(sessionStore.activeId, encoding.value as Encoding);
   }
   const profileId = activeProfileId.value;
-  if (!profileId) return;
+  if (!profileId) {
+    // 没有活动会话时只改全局默认值，保存后同样关闭对话框
+    close();
+    return;
+  }
   await profilesStore.setAppearance(profileId, {
     font_family: fontFamily.value,
     font_size: fontSize.value,
@@ -119,6 +147,27 @@ function close() {
               <option value="solarized-dark">Solarized Dark</option>
               <option value="solarized-light">Solarized Light</option>
             </select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Shell</label>
+            <div class="shell-picker">
+              <input
+                v-model="localShell"
+                class="form-input"
+                placeholder="留空使用系统默认"
+              />
+              <button class="btn picker" title="选择 Shell 程序" @click="browseLocalShell">浏览…</button>
+              <button class="btn picker" title="清除，使用系统默认" @click="clearLocalShell">清除</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label">参数</label>
+            <input
+              v-model="localShellArgs"
+              class="form-input"
+              :disabled="!localShellConfigured"
+              placeholder="如 -NoLogo"
+            />
           </div>
         </div>
         <div class="dialog-footer">
@@ -217,6 +266,30 @@ function close() {
 
 .form-input:focus {
   border-color: var(--accent);
+}
+
+.btn.picker {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.shell-picker {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell-picker .form-input {
+  flex: 1;
+}
+
+.form-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .dialog-footer {

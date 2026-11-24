@@ -4,6 +4,7 @@ import { useSessionStore } from "../stores/session";
 import { useProfilesStore } from "../stores/profiles";
 import { fontOptions, useSettingsStore, type TerminalColorScheme } from "../stores/settings";
 import { saveProfile, listSerialPorts } from "../lib/api";
+import { normalizeShellPath, pickShellPath, shellDisplayName } from "../lib/shellPicker";
 import type { Protocol, SessionConfig } from "../types/session";
 import type { PortForward, ProfileSessionView, SerialPortInfo } from "../types/profile";
 import { encodingOptions, type Encoding } from "../types/session";
@@ -33,6 +34,10 @@ const password = ref("");
 const privateKey = ref("");
 const privateKeyPassphrase = ref("");
 const serialPort = ref("");
+// 本地 Shell：新建时默认取「设置 → 默认设置」，可按会话临时修改
+const localShell = ref("");
+const localShellArgs = ref("");
+const localShellConfigured = computed(() => normalizeShellPath(localShell.value) !== "");
 const serialPorts = ref<SerialPortInfo[]>([]);
 const portsLoading = ref(false);
 const baudRate = ref(9600);
@@ -90,6 +95,7 @@ const parityOptions = [
 
 const targetLabel = computed(() => {
   if (protocol.value === "serial") return serialPort.value.trim();
+  if (protocol.value === "local") return shellDisplayName(localShell.value);
   return host.value.trim() || "";
 });
 
@@ -100,6 +106,7 @@ const canSubmit = computed(() => {
   if (protocol.value === "telnet") {
     return host.value.trim() !== "";
   }
+  if (protocol.value === "local") return true;
   return serialPort.value.trim() !== "";
 });
 
@@ -135,6 +142,8 @@ watch(
       privateKey.value = p.private_key ?? "";
       privateKeyPassphrase.value = "";
       serialPort.value = p.serial_port ?? "";
+      localShell.value = p.shell ?? "";
+      localShellArgs.value = p.shell_args ?? "";
       baudRate.value = p.baud_rate ?? 9600;
       dataBits.value = p.data_bits ?? 8;
       stopBits.value = p.stop_bits ?? 1;
@@ -158,6 +167,8 @@ watch(
       privateKey.value = "";
       privateKeyPassphrase.value = "";
       serialPort.value = "";
+      localShell.value = settingsStore.localShell;
+      localShellArgs.value = settingsStore.localShellArgs;
       baudRate.value = 9600;
       dataBits.value = 8;
       stopBits.value = 1;
@@ -183,6 +194,11 @@ watch(
 
 watch(protocol, async (p) => {
   port.value = p === "ssh" ? 22 : p === "telnet" ? 23 : port.value;
+  // 新建会话切到 Local 时补上默认 Shell（编辑档案保留其自身配置）
+  if (!props.editProfile && p === "local" && !localShell.value.trim()) {
+    localShell.value = settingsStore.localShell;
+    localShellArgs.value = settingsStore.localShellArgs;
+  }
   // 非 SSH 没有端口转发：自动退回常规页，避免停在禁用页
   if (p !== "ssh" && activeTab.value === "forward") activeTab.value = "general";
   if (p === "serial") {
@@ -208,6 +224,20 @@ function close() {
   emit("update:open", false);
 }
 
+async function browseLocalShell() {
+  try {
+    const picked = await pickShellPath(localShell.value);
+    if (picked) localShell.value = picked;
+  } catch {
+    /* 取消选择或系统对话框不可用：保持原值 */
+  }
+}
+
+function clearLocalShell() {
+  localShell.value = "";
+  localShellArgs.value = "";
+}
+
 async function submit() {
   if (!canSubmit.value || submitting.value) return;
   submitting.value = true;
@@ -230,6 +260,10 @@ async function submit() {
       const telnetUser = username.value.trim();
       config.username = telnetUser ? telnetUser : undefined;
       config.password = password.value ? password.value : undefined;
+    } else if (protocol.value === "local") {
+      const shellPath = normalizeShellPath(localShell.value);
+      config.shell = shellPath || undefined;
+      config.shell_args = shellPath ? localShellArgs.value.trim() || undefined : undefined;
     } else {
       config.serial_port = serialPort.value.trim();
       config.baud_rate = baudRate.value;
@@ -271,6 +305,8 @@ async function submit() {
         data_bits: config.data_bits,
         stop_bits: config.stop_bits,
         parity: config.parity,
+        shell: config.shell,
+        shell_args: config.shell_args,
         encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
         terminal_appearance: appearance,
         forwards: forwardList,
@@ -305,6 +341,8 @@ async function submit() {
       data_bits: config.data_bits,
       stop_bits: config.stop_bits,
       parity: config.parity,
+      shell: config.shell,
+      shell_args: config.shell_args,
       encoding: sessionEncoding.value === "utf-8" ? undefined : sessionEncoding.value,
       terminal_appearance: appearance,
       forwards: forwardList,
@@ -373,6 +411,7 @@ onBeforeUnmount(() => {
                 <option value="ssh">SSH</option>
                 <option value="telnet">Telnet</option>
                 <option value="serial">Serial</option>
+                <option value="local">Local</option>
               </select>
             </div>
 
@@ -428,7 +467,7 @@ onBeforeUnmount(() => {
               </template>
             </template>
 
-            <template v-else>
+            <template v-else-if="protocol === 'serial'">
               <div class="form-row">
                 <label class="form-label required">串口</label>
                 <select v-model="serialPort" class="form-input narrow" :disabled="portsLoading">
@@ -469,12 +508,36 @@ onBeforeUnmount(() => {
               </div>
             </template>
 
+            <template v-else>
+              <div class="form-row">
+                <label class="form-label">Shell</label>
+                <div class="shell-picker">
+                  <input
+                    v-model="localShell"
+                    class="form-input"
+                    placeholder="留空使用系统默认（cmd.exe / $SHELL）"
+                  />
+                  <button class="btn picker" title="选择 Shell 程序" @click="browseLocalShell">浏览…</button>
+                  <button class="btn picker" title="清除，使用系统默认" @click="clearLocalShell">清除</button>
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="form-label">参数</label>
+                <input
+                  v-model="localShellArgs"
+                  class="form-input"
+                  :disabled="!localShellConfigured"
+                  placeholder="如 -NoLogo"
+                />
+              </div>
+            </template>
+
             <div class="section-divider">保存选项</div>
             <div class="form-row">
               <label class="form-label">会话名称</label>
               <input v-model="sessionName" class="form-input" :placeholder="targetLabel || '自动使用主机名'" />
             </div>
-            <div class="form-row">
+            <div v-if="protocol === 'ssh' || protocol === 'telnet'" class="form-row">
               <label class="form-label">记住密码</label>
               <label class="remember-check">
                 <input v-model="rememberPassword" type="checkbox" />
@@ -763,6 +826,30 @@ onBeforeUnmount(() => {
 .btn.small {
   padding: 4px 12px;
   font-size: 11px;
+}
+
+.btn.picker {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.shell-picker {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell-picker .form-input {
+  flex: 1;
+}
+
+.form-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .section-divider {

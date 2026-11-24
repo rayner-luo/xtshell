@@ -21,6 +21,10 @@ export interface ProfileSessionView {
   data_bits?: number;
   stop_bits?: number;
   parity?: string;
+  /** 本地 Shell（仅 local 生效） */
+  shell?: string;
+  /** 本地 Shell 启动参数（仅 local 且 shell 非空时生效） */
+  shell_args?: string;
   encoding?: string;
   terminal_appearance?: TerminalAppearance | null;
   forwards?: PortForward[];
@@ -78,6 +82,10 @@ export interface SaveProfileRequest {
   forwards?: PortForward[];
   socks5?: Socks5Config | null;
   parity?: string;
+  /** 本地 Shell（仅 local 生效） */
+  shell?: string;
+  /** 本地 Shell 启动参数（仅 local 且 shell 非空时生效） */
+  shell_args?: string;
 }
 
 export interface SerialPortInfo {

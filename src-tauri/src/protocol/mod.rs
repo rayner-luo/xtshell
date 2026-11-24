@@ -18,6 +18,7 @@ pub trait TerminalStream: Send {
     async fn close(&mut self) -> AppResult<()>;
 }
 
+pub mod local;
 pub mod serial;
 pub mod socks5;
 pub mod ssh;

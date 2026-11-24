@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, type DialogFilter } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /**
@@ -34,4 +34,17 @@ export async function pickFiles(): Promise<string[] | null> {
   const paths = await open({ multiple: true });
   if (!paths) return null;
   return Array.isArray(paths) ? paths : [paths];
+}
+
+export interface PickFileOptions {
+  title?: string;
+  defaultPath?: string;
+  filters?: DialogFilter[];
+}
+
+/** 选一个文件（Shell 程序选择等）；取消返回 null */
+export async function pickFile(options: PickFileOptions = {}): Promise<string | null> {
+  await activateMainWindow();
+  const path = await open({ multiple: false, directory: false, ...options });
+  return typeof path === "string" ? path : null;
 }

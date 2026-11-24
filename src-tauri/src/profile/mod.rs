@@ -121,6 +121,12 @@ pub struct ProfileSession {
     pub stop_bits: Option<u8>,
     #[serde(default)]
     pub parity: Option<String>,
+    /// 本地 Shell（仅 protocol=local）：可执行文件路径；留空=系统默认。
+    #[serde(default)]
+    pub shell: Option<String>,
+    /// 本地 Shell 启动参数（仅 protocol=local 且 shell 非空时生效）。
+    #[serde(default)]
+    pub shell_args: Option<String>,
     #[serde(default)]
     pub encoding: Option<String>,
     #[serde(default)]
@@ -159,6 +165,8 @@ pub struct ProfileSessionView {
     pub data_bits: Option<u8>,
     pub stop_bits: Option<u8>,
     pub parity: Option<String>,
+    pub shell: Option<String>,
+    pub shell_args: Option<String>,
     pub encoding: Option<String>,
     #[serde(default)]
     pub terminal_appearance: Option<TerminalAppearance>,
@@ -210,6 +218,12 @@ pub struct SaveProfileRequest {
     pub stop_bits: Option<u8>,
     #[serde(default)]
     pub parity: Option<String>,
+    /// 本地 Shell（仅 protocol=local）
+    #[serde(default)]
+    pub shell: Option<String>,
+    /// 本地 Shell 启动参数（仅 protocol=local 且 shell 非空时生效）
+    #[serde(default)]
+    pub shell_args: Option<String>,
     #[serde(default)]
     pub encoding: Option<String>,
     #[serde(default)]
@@ -286,6 +300,8 @@ impl ProfileStore {
                     data_bits: s.data_bits,
                     stop_bits: s.stop_bits,
             parity: s.parity.clone(),
+            shell: s.shell.clone(),
+            shell_args: s.shell_args.clone(),
             encoding: s.encoding.clone(),
             terminal_appearance: s.terminal_appearance.clone(),
             forwards: s.forwards.clone(),
@@ -466,6 +482,18 @@ impl ProfileStore {
         } else {
             None
         };
+        // 本地 Shell 只对 local 有意义；空串视作「系统默认」不落库
+        let shell = if req.protocol == "local" {
+            req.shell.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+        } else {
+            None
+        };
+        // 没有路径就不保留参数（与后端「系统默认 Shell 忽略参数」保持一致）
+        let shell_args = shell.as_ref().and_then(|_| {
+            req.shell_args
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        });
 
         let new_entry = ProfileSession {
             id: id.clone(),
@@ -485,6 +513,8 @@ impl ProfileStore {
             data_bits: req.data_bits,
             stop_bits: req.stop_bits,
             parity: req.parity,
+            shell,
+            shell_args,
             encoding: req.encoding,
             terminal_appearance: req.terminal_appearance,
             forwards,
@@ -568,6 +598,8 @@ impl ProfileStore {
             data_bits: p.data_bits,
             stop_bits: p.stop_bits,
             parity: p.parity.clone(),
+            shell: p.shell.clone(),
+            shell_args: p.shell_args.clone(),
             profile_id: Some(p.id.clone()),
             forwards: p.forwards.clone(),
             socks5: p.socks5.clone(),
@@ -738,6 +770,58 @@ mod tests {
         assert_eq!(cfg.port, Some(2222));
         // 认证失败后前端据此弹凭据重输框
         assert_eq!(cfg.profile_id.as_deref(), Some(id.as_str()));
+    }
+
+    #[test]
+    fn local_shell_and_args_persist_only_for_local() {
+        let mut s = store();
+        let id = s
+            .upsert_session(SaveProfileRequest {
+                id: None,
+                name: "local".into(),
+                folder: None,
+                protocol: "local".into(),
+                shell: Some(r"  C:\Windows\System32\cmd.exe  ".into()),
+                shell_args: Some("  /k echo hi  ".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            s.file.sessions[0].shell.as_deref(),
+            Some(r"C:\Windows\System32\cmd.exe")
+        );
+        assert_eq!(s.file.sessions[0].shell_args.as_deref(), Some("/k echo hi"));
+        let cfg = s.build_session_config(&id).unwrap();
+        assert_eq!(cfg.shell.as_deref(), Some(r"C:\Windows\System32\cmd.exe"));
+        assert_eq!(cfg.shell_args.as_deref(), Some("/k echo hi"));
+
+        // 路径为空 = 系统默认 Shell，参数不落库
+        s.upsert_session(SaveProfileRequest {
+            id: Some(id.clone()),
+            name: "local".into(),
+            folder: None,
+            protocol: "local".into(),
+            shell: None,
+            shell_args: Some("-l".into()),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(s.file.sessions[0].shell.is_none());
+        assert!(s.file.sessions[0].shell_args.is_none());
+
+        // 切回 SSH：本地 Shell 与参数都不再有意义，保存时清空
+        s.upsert_session(SaveProfileRequest {
+            id: Some(id),
+            name: "local".into(),
+            folder: None,
+            protocol: "ssh".into(),
+            shell: Some("cmd.exe".into()),
+            shell_args: Some("/k".into()),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(s.file.sessions[0].shell.is_none());
+        assert!(s.file.sessions[0].shell_args.is_none());
     }
 
     #[test]

@@ -22,6 +22,10 @@ interface SavedSettings {
   fontSize: number;
   theme: ThemeName;
   colorScheme: TerminalColorScheme;
+  /** 本地 Shell（protocol=local）：可执行文件路径；空串=系统默认 */
+  localShell: string;
+  /** 本地 Shell 启动参数（仅路径非空时生效） */
+  localShellArgs: string;
 }
 
 function load(): SavedSettings {
@@ -41,6 +45,8 @@ function load(): SavedSettings {
           || parsed.colorScheme === "solarized-dark" || parsed.colorScheme === "solarized-light"
           ? parsed.colorScheme
           : "dark",
+        localShell: typeof parsed.localShell === "string" ? parsed.localShell : "",
+        localShellArgs: typeof parsed.localShellArgs === "string" ? parsed.localShellArgs : "",
       };
     }
   } catch {
@@ -51,6 +57,8 @@ function load(): SavedSettings {
     fontSize: 13,
     theme: "light",
     colorScheme: "dark",
+    localShell: "",
+    localShellArgs: "",
   } satisfies SavedSettings;
 }
 
@@ -67,9 +75,11 @@ export const useSettingsStore = defineStore("settings", () => {
   const theme = ref<ThemeName>(saved.theme);
   const encoding = ref<Encoding>("utf-8");
   const colorScheme = ref<TerminalColorScheme>(saved.colorScheme);
+  const localShell = ref<string>(saved.localShell);
+  const localShellArgs = ref<string>(saved.localShellArgs);
 
   watch(
-    [fontFamily, fontSize, theme, colorScheme],
+    [fontFamily, fontSize, theme, colorScheme, localShell, localShellArgs],
     () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -78,6 +88,8 @@ export const useSettingsStore = defineStore("settings", () => {
           fontSize: fontSize.value,
           theme: theme.value,
           colorScheme: colorScheme.value,
+          localShell: localShell.value,
+          localShellArgs: localShellArgs.value,
         }),
       );
     },
@@ -93,5 +105,14 @@ export const useSettingsStore = defineStore("settings", () => {
     theme.value = t;
   }
 
-  return { fontFamily, fontSize, theme, encoding, colorScheme, setTheme };
+  return {
+    fontFamily,
+    fontSize,
+    theme,
+    encoding,
+    colorScheme,
+    localShell,
+    localShellArgs,
+    setTheme,
+  };
 });

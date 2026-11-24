@@ -26,6 +26,14 @@ pub struct SessionConfig {
     pub data_bits: Option<u8>,
     pub stop_bits: Option<u8>,
     pub parity: Option<String>,
+    /// 本地 Shell（仅 protocol=local）：可执行文件路径，留空表示使用系统默认
+    /// Shell（Windows: cmd.exe，Unix: $SHELL）。
+    #[serde(default)]
+    pub shell: Option<String>,
+    /// 本地 Shell 的启动参数（仅 protocol=local 且 shell 非空时生效）：
+    /// 空白分隔，含空格的参数用引号包裹。
+    #[serde(default)]
+    pub shell_args: Option<String>,
     /// 由已保存档案启动时记录其 id（见 `ProfileStore::build_session_config`）；
     /// SSH 认证失败时前端据此弹出凭据重输框。手工新建的会话为 None。
     #[serde(default)]
@@ -500,6 +508,26 @@ impl LogScreen {
     }
 }
 
+/// 会话在侧栏/标签上显示的目标：主机、串口，或本地 Shell。
+fn session_target(config: &SessionConfig) -> String {
+    let shell = config
+        .shell
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    match config
+        .host
+        .clone()
+        .or_else(|| config.serial_port.clone())
+        .or(shell)
+    {
+        Some(target) => target,
+        None if config.protocol == "local" => "本地 Shell".into(),
+        None => String::new(),
+    }
+}
+
 impl SessionManager {
     pub fn new(buf_cap: usize) -> Self {
         SessionManager { sessions: HashMap::new(), buf_cap }
@@ -650,12 +678,7 @@ impl SessionManager {
             .map(|s| SessionInfo {
                 id: s.id.clone(),
                 protocol: s.config.protocol.clone(),
-                target: s
-                    .config
-                    .host
-                    .clone()
-                    .or_else(|| s.config.serial_port.clone())
-                    .unwrap_or_default(),
+                target: session_target(&s.config),
                 state: s.state,
             })
             .collect()

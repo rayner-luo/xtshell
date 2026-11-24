@@ -1,12 +1,12 @@
 # xtshell
 
-SSH / Telnet / Serial 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript，终端渲染使用 xterm.js。
+SSH / Telnet / Serial / 本地 Shell 终端管理工具，基于 Tauri 2 + Vue 3 + TypeScript，终端渲染使用 xterm.js。
 
 ![xtshell 主界面](docs/screenshots/main.png)
 
 ## 功能
 
-- **多协议**：SSH（密码 / 私钥 + 口令，兼容老式设备的旧 KEX/加密算法）、Telnet（IAC 协商过滤 + 自动登录）、Serial（串口参数可配置）
+- **多协议**：SSH（密码 / 私钥 + 口令，兼容老式设备的旧 KEX/加密算法）、Telnet（IAC 协商过滤 + 自动登录）、Serial（串口参数可配置）、Local（在本机伪终端里打开本地 Shell，路径与启动参数可分别配置，路径留空用系统默认）
 - **会话管理**：多会话并行、标签页切换，连接配置以目录树保存（可拖拽整理）
 - **凭据安全**：密码与私钥口令用 AES-256-GCM 加密落盘；SSH 主机密钥经 known_hosts 校验，首次连接弹框确认指纹
 - **SFTP**：在既有 SSH 会话上开 subsystem 通道，支持浏览、上传、下载、新建目录、重命名、递归删除
@@ -39,7 +39,7 @@ ls /usr/lib/*/libwebkit2gtk-4.1.so.0    # 需存在
 
 ## 界面预览
 
-**支持 SSH / Telnet / Serial** —— 新建会话分「常规 / 终端 / 转发」三页，
+**支持 SSH / Telnet / Serial / Local** —— 新建会话分「常规 / 终端 / 转发」三页，
 SSH 额外支持本地端口转发（本地监听 → 经会话转发到远端）。
 
 ![新建会话](docs/screenshots/new-session.png)

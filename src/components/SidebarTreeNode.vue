@@ -38,7 +38,9 @@ const indent = computed(() => 8 + props.depth * 14);
 const profileIndent = computed(() => indent.value + (props.depth > 0 ? 14 : 0));
 
 const protoTag = computed(() =>
-  props.profile ? { ssh: "SSH", telnet: "TEL", serial: "SER" }[props.profile.protocol] : "",
+  props.profile
+    ? { ssh: "SSH", telnet: "TEL", serial: "SER", local: "LOC" }[props.profile.protocol]
+    : "",
 );
 
 function toggle() {
@@ -254,6 +256,10 @@ function onDrop(e: DragEvent) {
 
 .proto-badge.serial {
   color: var(--accent-blue);
+}
+
+.proto-badge.local {
+  color: var(--icon-accent);
 }
 
 .edit-input {

@@ -29,8 +29,9 @@ Thumbs.db
 *.tsbuildinfo
 .eslintcache
 
-# opencode 会话数据
+# opencode / DSH 本地会话与记忆数据
 .zcode/
+.dsh-meow/
 
 # Windows 下载文件附带的 Zone.Identifier 备用数据流
 *:Zone.Identifier
